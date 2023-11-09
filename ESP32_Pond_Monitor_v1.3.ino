@@ -5,7 +5,7 @@
 #include <DallasTemperature.h>
 #include <TFMPlus.h>  // Include TFMini Plus Library v1.5.0
 #include <StopWatch.h>
-#include "SuperMon.h"         // .h file that stores your html page code
+#include "SuperMon1_3.h"         // .h file that stores your html page code
 #include <HTTPClient.h>
 // here you post web pages to your homes intranet which will make page debugging easier
 // as you just need to refresh the browser as opposed to reconnection to the web server
