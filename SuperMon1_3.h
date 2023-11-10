@@ -1,5 +1,3 @@
-
-
 // note R"KEYWORD( html page code )KEYWORD"; 
 // again I hate strings, so char is it and this method let's us write naturally
 
@@ -20,6 +18,13 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
         width: 100%;
         height: 100%;
         background-image: url('https://aiot-consulting.github.io/Static-Assets/pond_backgrd.jpg');
+    }
+    span {
+        position: relative;
+        font-size:12px;
+        color: white;
+        vertical-align:top;
+        top: 3px;
     }
     h1 {
       margin:0;
@@ -60,23 +65,6 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       color:black;
       font-size:12px;
     }
-    h6 {
-      margin:0;
-      padding:0px 0px;
-      font-family: arial;
-      color:red;
-        text-align:left;
-      font-size:6px;
-      /* letter-spacing:1px; */
-        
-  }
-    span {
-      position: relative;
-      font-size:14px;
-      color: white;
-      vertical-align:top;
-      top: 2px;
-    }
     table {
       position: relative;
       width:100%;
@@ -101,6 +89,18 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       border-radius: 5px;
       background-color: white;
       padding: 0px;
+    }
+    #table_data{
+      table-layout: auto;
+      width: 60%;
+      max-width: 800px;
+      min-width: 680px;
+      height: auto;
+      border: 3px solid rgb(203, 202, 202);
+      background-color: grey;
+      border-radius: 5px;
+      padding: 0px;
+      vertical-align: middle;
     }
     #table_S{
       table-layout: auto;
@@ -128,99 +128,6 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       vertical-align: middle;
       text-align: center;
     }
-    span {
-        position: relative;
-        font-size:12px;
-        color: white;
-        vertical-align:top;
-        top: 2px;
-    }
-    .tabledata {
-      font-size: 24px;
-      position: relative;
-      padding-left: 5px;
-      padding-top: 5px;
-      height:   25px;
-      border-radius: 5px;
-      color: #FFFFFF;
-      line-height: 20px;
-      transition: all 200ms ease-in-out;
-      background-color: #00AA00;
-    }
-    #table_data{
-      table-layout: auto;
-      width: 60%;
-      max-width: 800px;
-      min-width: 680px;
-      height: auto;
-      border: 2px solid rgb(203, 202, 202);
-      background-color: grey;
-      border-radius: 5px;
-      padding: 0px;
-      vertical-align: middle;
-    }
-
-    .bodytext {
-      font-family: "Verdana", "Arial", sans-serif;
-      font-size: 24px;
-      text-align: left;
-      font-weight: light;
-      border-radius: 5px;
-      display:inline;
-    }
-    .navbar {
-      width: 100%;
-      height: 50px;
-      margin: 0;
-      padding: 10px 0px;
-      background-color: #FFF;
-      color: #000000;
-      border-bottom: 5px solid #293578;
-    }
-    .fixed-top {
-      position: fixed;
-      top: 0;
-      right: 0;
-      left: 0;
-      z-index: 1030;
-    }
-
-   .navheading {
-     position: fixed;
-     left: 60%;
-     height: 50px;
-     font-family: "Verdana", "Arial", sans-serif;
-     font-size: 20px;
-     font-weight: bold;
-     line-height: 20px;
-     padding-right: 20px;
-   }
-   .navdata {
-      justify-content: flex-end;
-      position: fixed;
-      left: 70%;
-      height: 50px;
-      font-family: "Verdana", "Arial", sans-serif;
-      font-size: 20px;
-      font-weight: bold;
-      line-height: 20px;
-      padding-right: 20px;
-   }
-    .category {
-      font-family: "Verdana", "Arial", sans-serif;
-      font-weight: bold;
-      font-size: 32px;
-      line-height: 50px;
-      padding: 20px 10px 0px 10px;
-      color: #000000;
-    }
-    .heading {
-      font-family: "Verdana", "Arial", sans-serif;
-      font-weight: normal;
-      font-size: 28px;
-      text-align: left;
-    }
-    
     input[type="checkbox"] {
       margin: 2px;
       position:relative;
@@ -390,28 +297,6 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
         background-color: #b31b00;
         box-shadow: 0 0 0 4px #353535, 0 0 0 5px #3e3e3e, inset 0 0 10px rgba(0,0,0,1);
     }
-    .btn {
-      background-color: #444444;
-      border: none;
-      color: white;
-      padding: 10px 20px;
-      text-align: center;
-      text-decoration: none;
-      display: inline-block;
-      font-size: 16px;
-      margin: 4px 2px;
-      cursor: pointer;
-    }
-    }
-    .foot {
-      font-family: "Verdana", "Arial", sans-serif;
-      font-size: 20px;
-      position: relative;
-      height:   30px;
-      text-align: center;   
-      color: #AAAAAA;
-      line-height: 20px;
-    }
     .container {
       display: block;
       margin-left: auto;
@@ -423,20 +308,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       text-align: center;
       min-width: 800px;
       max-width: 1000px;
-    }
-    table tr:first-child th:first-child {
-      border-top-left-radius: 5px;
-    }
-    table tr:first-child th:last-child {
-      border-top-right-radius: 5px;
-    }
-    table tr:last-child td:first-child {
-      border-bottom-left-radius: 5px;
-    }
-    table tr:last-child td:last-child {
-      border-bottom-right-radius: 5px;
-    }
-        
+    } 
   </style>
   </head>
   
@@ -502,20 +374,21 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-font-title-style="bolder"
                     data-font-title-size="25"
                     data-color-title="black"
-                    data-value="50"
+                    data-value="0"
                     data-value-Int="1"
                     data-value-Dec="1"
                     data-animate-on-init="true"
                     data-animated-value="true"
-                    data-min-value="0"
-                    data-max-value="50"
-                    data-major-ticks="0,5,10,15,20,25,30,35,40,45,50"
+                    data-min-value="-10"
+                    data-max-value="40"
+                    data-major-ticks="-10,-5,0,5,10,15,20,25,30,35,40"
                     data-minor-ticks="5"
                     data-highlights='[
+                    { "from": -10, "to": 0, "color": "rgba(193, 51, 51,.75)" },
                     { "from": 0, "to": 15, "color": "rgba(255, 241, 41,.85)" },
                     { "from": 15, "to": 25, "color": "rgba(44, 201, 55,.75)" },
                     { "from": 25, "to": 32, "color": "rgba(255, 241, 41,.85)" },
-                    { "from": 32, "to": 50, "color": "rgba(193, 51, 51,.75)" }                     
+                    { "from": 32, "to": 40, "color": "rgba(193, 51, 51,.75)" }                     
                     ]'
                     data-color-needle-start="rgba(240, 128, 128, 1)"
                     data-color-needle-end="rgba(255, 160, 122, .9)"
@@ -655,13 +528,13 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                 </table>
                 
             <table id="table_data">
-            <tr><td style="text-align: left" width="12%";><h4>&nbsp;Water Temp:</h4><h4>&nbsp;Max Water Temp:</h4></td><td style="text-align: left" width="10%";><span id="dataTable1"> ...</span><span> &#8451</span><br><span id="dataTable2"> ...</span><span> &#8451</span></h4></td>
-                <td width="4%";></td>
+            <tr><td style="text-align: left" width="12%";><h4>&nbsp;Water Temp:</h4><h4>&nbsp;Max Water Temp:</h4></td><td style="text-align: left" width="8%";><span id="dataTable1"> ...</span><span> &#8451</span><br><span id="dataTable2"> ...</span><span> &#8451</span></h4></td>
+                <td width="2%";></td>
                 <td style="text-align: left" width="12%";><h4>&nbsp;Filter Press:</h4><h4>&nbsp;Air Pump Press:</h4></td><td style="text-align: left" width="10%";><span id="dataTable3"> ...</span><span> psi</span><br><span id="dataTable4"> ...</span><span> psi</span></td>
-                <td width="4%";></td>
+                <td width="2%";></td>
                 <td style="text-align: left" width="12%";><h4>&nbsp;Water Level:</h4><h4>&nbsp;TDS Value:</h4></td><td style="text-align: left" width="10%";><span id="dataTable5"> ...</span><span> gals</span><br><span id="dataTable6"> ...</span><span> ppm</span></td>
-                <td width="4%";></td>
-                <td style="text-align: left" width="12%";><h4>&nbsp;MCU Temp:</h4><h4>&nbsp;Timer:</h4></td><td style="text-align: left" width="10%";><span id="dataTable7"> ...</span><span> &#8451</span><br><span id="dataTable8"> ...</span></td>
+                <td width="2%";></td>
+                <td style="text-align: left" width="12%";><h4>&nbsp;MCU Temp:</h4><h4>&nbsp;Timer:</h4></td><td style="text-align: left" width="18%";><span id="dataTable7"> ...</span><span> &#8451</span><br><span id="dataTable8"> ...</span></td>
             </tr>   
             </table>
             <table id="table_S">
@@ -763,12 +636,15 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       xmldoc = xmlResponse.getElementsByTagName("G"); 
       message = xmldoc[0].firstChild.nodeValue;
       document.getElementById("gauge_1").setAttribute("data-value", message);
+      document.getElementById("dataTable5").innerHTML = message;
                  
       // Gauge 2 Liquid Temperature
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[1].firstChild.nodeValue;
+      
       document.getElementById("gauge_2").setAttribute("data-value", message);
-
+      document.getElementById("dataTable1").innerHTML = message;
+      
       // Gauge 3 Feeder Level
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[2].firstChild.nodeValue;
@@ -857,12 +733,15 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       // Dashboard Table Data
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[0].firstChild.nodeValue;
-      document.getElementById("dataTable7").innerHTML = message;
-
+      document.getElementById("dataTable2").innerHTML = message;
+            
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[1].firstChild.nodeValue;
-      document.getElementById("dataTable8").innerHTML = message;
+      document.getElementById("dataTable7").innerHTML = message;
       
+      xmldoc = xmlResponse.getElementsByTagName("DT");
+      message = xmldoc[2].firstChild.nodeValue;
+      document.getElementById("dataTable8").innerHTML = message;
     }
   
     // general processing code for the web page to ask for an XML steam
@@ -882,8 +761,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
         // a longer timeout
         setTimeout("process()",500);
      }
-
-     
+    
     </script>
 
 </html>
