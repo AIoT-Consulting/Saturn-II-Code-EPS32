@@ -67,7 +67,7 @@ float avgDist1 = 0;
 float duration1;   
 
 // TEMP SENSOR VARIABLES:
-int temp_XML = 0;
+float temp_XML = 0;
 const int oneWireBus = 4;
 byte tempSensor1[] = {0x28, 0xFF, 0xAF, 0x82, 0x0E, 0x00, 0x00, 0x3E};  // Unique DS18B20 address - need to change this for each sensor
 int tempConsistHot=0;
@@ -200,6 +200,7 @@ void IRAM_ATTR push_but3_ISR() {
       digitalWrite(21, LOW);
       startTime = millis();
       resetStopWatch = true;
+      maxTemp = 0;
       last_button_time = button_time;     
     }
 }
@@ -223,7 +224,6 @@ void setup() {
   tfmP.sendCommand( SOFT_RESET, 0);
   delay(500);
   sensors.begin();                                    // Start the DS18B20 sensor
-    
   pinMode(2, OUTPUT);         // Pushbutton LED for Switch 1
   pinMode(18, OUTPUT);        // Pushbutton LED for Switch 2
   pinMode(19, OUTPUT);        // Pushbutton LED for RESET
@@ -305,7 +305,6 @@ void loop() {
     timeToString(strTime, sizeof(strTime));
     lastTimeUpdateMillis = millis();;
   } 
-  Serial.println(strTime);
 }
 
 int cpuTempCalib() {
@@ -349,6 +348,7 @@ void processButtonThree() {
   digitalWrite(21, LOW);
   startTime = millis();
   resetStopWatch = true;
+  maxTemp = 0;
   server.send(200, "text/plain", ""); 
 }
 
@@ -400,7 +400,7 @@ void SendXML() {
   strcat(XML, buf);
   
   // send temp_XML
-  sprintf(buf, "<G>%d</G>\n", temp_XML);
+  sprintf(buf, "<G>%4.1f</G>\n", temp_XML);
   strcat(XML, buf);
 
   // send feed_XML
@@ -465,23 +465,18 @@ void SendXML() {
   strcat(XML, buf);
 
   // send datatable values for dashboard
+  
+  sprintf(buf, "<DT>%4.1f</DT>\n", maxTemp);
+  strcat(XML, buf);
   sprintf(buf, "<DT>%d</DT>\n", cpuTempVal);
   strcat(XML, buf);
-
-  // send datatable values for dashboard
   sprintf(buf, "<DT>%s</DT>\n", strTime);
   strcat(XML, buf);
   
   strcat(XML, "</Data>\n");
-  // wanna see what the XML code looks like?
-  // actually print it to the serial monitor and use some text editor to get the size
-  // then pad and adjust char XML[2048]; above
-  //Serial.println(XML);
   
-  // you may have to play with this value, big pages need more porcessing time, and hence
-  // a longer timeout that 200 ms
   server.send(200, "text/xml", XML);
-
+  Serial.println(maxTemp);
 
 }
 
@@ -500,9 +495,9 @@ float liquidCalib() {
 float ds18b20Calib() {
   sensors.requestTemperatures();
   tempObjecC = sensors.getTempC(tempSensor1);
-  //if (tempObjecC < -125) {tempObjecC = previousTemp;}
-  //if ((tempObjecC > maxTemp) && (stableTime > 10000)) {maxTemp = tempObjecC;} 
-  //if ((tempObjecC > 51) || (tempObjecC < -40)) {tempObjecC = 0; }
+  if(tempObjecC > maxTemp) {maxTemp = tempObjecC; }
+  if (tempObjecC < -10) {tempObjecC = -10;}
+  if (tempObjecC > 40) {tempObjecC = 40; }
   return tempObjecC;
 }
 
