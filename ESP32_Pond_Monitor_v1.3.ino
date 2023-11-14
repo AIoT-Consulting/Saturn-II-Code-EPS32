@@ -5,7 +5,8 @@
 #include <DallasTemperature.h>
 #include <TFMPlus.h>  // Include TFMini Plus Library v1.5.0
 #include <StopWatch.h>
-#include "SuperMon1_3.h"         // .h file that stores your html page code
+
+#include "web_interface_1.3.h"         // .h file that stores our webpage interface
 #include <HTTPClient.h>
 // here you post web pages to your homes intranet which will make page debugging easier
 // as you just need to refresh the browser as opposed to reconnection to the web server
@@ -19,15 +20,11 @@
 #define AP_SSID "Pond"
 #define AP_PASS "Fish"
 
-// start your defines for pins for sensors, outputs etc.
-#define PIN_PUSHBUT_1 25  // Connected to the Push Button 1 LED
-#define PIN_OUTPUT 26     // connected to nothing but an example of a digital write from the web page
-#define PIN_A0 34         // some analog input sensor
-#define PIN_A1 35         // some analog input sensor
-#define RXD2 16
-#define TXD2 17
-
-const char* serverName = "https://maker.ifttt.com/trigger/Pond_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
+// Individual SMS event triggers
+const char* eventLiquid = "https://maker.ifttt.com/trigger/Liquid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
+const char* eventSolid = "https://maker.ifttt.com/trigger/Solid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
+const char* eventTemp = "https://maker.ifttt.com/trigger/Temp_High/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
+const char* eventTds = "https://maker.ifttt.com/trigger/Tds_High/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
 
 // Code to access internal CPU temperature 
 #ifdef __cplusplus
@@ -44,7 +41,7 @@ int online = 0;
 int offCount = 0;
 float VoltsA0 = 0, VoltsA1 = 0;
 bool senderOverride = false; 
-bool smsFeedOverride, smsTempOverride, smsTdsOverride, smsLevelOverride, smsWarnOverride = false;       
+bool smsSolidOverride, smsTempOverride, smsTdsOverride, smsLevelOverride, smsWarnOverride = false;       
 bool LED0 = false, SomeOutput = false;
 uint32_t SensorUpdate = 0;
 
@@ -91,15 +88,15 @@ String tdsString = "999";
 int tdsConsistHigh = 0;
 int tdsConsistLow = 0;
 
-// FISH FEEDER FOOD LEVEL VARIABLES
+// SOLID LEVEL VARIABLES
 uint8_t feed_buf[9] = {0};                                 // An array that holds data
-int feed_XML = 0;
-int feed_dist = 0;                                         // The variable "distance2" will contain the distance value in millimeter from FishFeeder distance sensor
-int feederLevelVal = 0;
-int feedConsistFull=0;
-int feedConsistLow=0;
-String feedString = "999";
-int feedLevel; 
+int solid_XML = 0;
+int solid_dist = 0;                                         // The variable "distance2" will contain the distance value in millimeter from FishFeeder distance sensor
+int solidLevelVal = 0;
+int solidConsistFull=0;
+int solidConsistLow=0;
+String solidString = "999";
+int soldiLevel; 
 
 // FILTER PRESSURE SENSOR VARIABLES:
 float press_XML = 0.0;
@@ -162,9 +159,9 @@ IPAddress gateway(192, 168, 1, 1);
 IPAddress subnet(255, 255, 255, 0);
 IPAddress ip;
 
-// gotta create a server
 WebServer server(80);
-TFMPlus tfmP;                                         // Create a TFMini Plus object
+TFMPlus tfmpLiquid;                                   // Create a TFMini Plus object for liquid level
+TFMPlus tfmpSolid;                                    // Create a TFMini Plus object for solid level
 OneWire oneWire(oneWireBus);                          // Setup a oneWire instance to communicate with any OneWire devices
 DallasTemperature sensors(&oneWire);                  // Pass our oneWire reference to Dallas Temperature sensor 
 StopWatch relayOne;
@@ -189,18 +186,7 @@ void IRAM_ATTR push_but2_ISR() {
 void IRAM_ATTR push_but3_ISR() {
   button_time = millis();
   if (button_time - last_button_time > 500) {
-      buttonThreeStatus = !buttonThreeStatus;
-      digitalWrite(19,HIGH);
-      if(buttonOneStatus) {buttonOneStatus = false;}
-      if(buttonTwoStatus) {buttonTwoStatus = false;}
-      if(buttonFourStatus){buttonFourStatus = false;}
-      smsLevelOverride = false;
-      digitalWrite(2,LOW);
-      digitalWrite(18, LOW);
-      digitalWrite(21, LOW);
-      startTime = millis();
-      resetStopWatch = true;
-      maxTemp = 0;
+      resetVariables();
       last_button_time = button_time;     
     }
 }
@@ -216,12 +202,15 @@ void IRAM_ATTR push_but4_ISR() {
 
 
 void setup() {
-  // standard stuff here
-  Serial.begin(9600);
-  Serial2.begin(115200);
+  Serial.begin(115200);
+  Serial1.begin(115200, SERIAL_8N1, 32, 33);
+  Serial2.begin(115200, SERIAL_8N1, 16, 17);
   delay(20);
-  tfmP.begin( &Serial2);
-  tfmP.sendCommand( SOFT_RESET, 0);
+  tfmpLiquid.begin( &Serial2);
+  tfmpLiquid.sendCommand( SOFT_RESET, 0);
+  delay(500);
+  tfmpSolid.begin( &Serial1);
+  tfmpSolid.sendCommand( SOFT_RESET, 0);
   delay(500);
   sensors.begin();                                    // Start the DS18B20 sensor
   pinMode(2, OUTPUT);         // Pushbutton LED for Switch 1
@@ -250,16 +239,17 @@ void setup() {
   //  disableCore1WDT();
 
   // just an update to progress
-  Serial.println("starting server");
+  //Serial.println("starting server");
 
   // if you have this #define USE_INTRANET,  you will connect to your home intranet, again makes debugging easier
 #ifdef USE_INTRANET
   WiFi.begin(LOCAL_SSID, LOCAL_PASS);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
-    Serial.print(".");
+    //Serial.print(".");
   }
-  Serial.print("IP address: "); Serial.println(WiFi.localIP());
+  //Serial.print("IP address: "); 
+  //Serial.println(WiFi.localIP());
   Actual_IP = WiFi.localIP();
 #endif
 
@@ -272,7 +262,8 @@ void setup() {
   WiFi.softAPConfig(PageIP, gateway, subnet);
   delay(100);
   Actual_IP = WiFi.softAPIP();
-  Serial.print("IP address: "); Serial.println(Actual_IP);
+  //Serial.print("IP address: "); 
+  //Serial.println(Actual_IP);
 #endif
 
   printWifiStatus();
@@ -287,15 +278,15 @@ void setup() {
 }
 
 void loop() {
-
+  
   triggerCheck();
   if ((millis() - SensorUpdate) >= 1000) {
     SensorUpdate = millis();
     level_XML = liquidCalib();
     temp_XML = ds18b20Calib();
-    feed_XML = 9;
+    solid_XML = solidCalib();
     press_XML = 2.3;
-    tds_XML = 200;
+    tds_XML = 350;
     cpuTempVal = cpuTempCalib();
   }
   server.handleClient();
@@ -308,7 +299,6 @@ void loop() {
 }
 
 int cpuTempCalib() {
-  
   cpuTemp = (temprature_sens_read() - 32) / 1.8;
   //The following code is to calculate the rolling average of the last 10 readings...
   totalCpuTemp = totalCpuTemp - readingsCpuTemp[readIndexCpu];
@@ -319,8 +309,6 @@ int cpuTempCalib() {
   avgCpuTemp = totalCpuTemp / numCpuReadings;
   return avgCpuTemp;
 }
-
-
 
 void processButtonOne() {
 
@@ -337,18 +325,7 @@ void processButtonTwo() {
 }
 
 void processButtonThree() {
-  buttonThreeStatus = true;
-  smsLevelOverride = false;
-  digitalWrite(19,HIGH);
-  if(buttonOneStatus) {buttonOneStatus = false;}
-  if(buttonTwoStatus) {buttonTwoStatus = false;}
-  if(buttonFourStatus){buttonFourStatus = false; senderOverride = false;}
-  digitalWrite(2,LOW);
-  digitalWrite(18, LOW);
-  digitalWrite(21, LOW);
-  startTime = millis();
-  resetStopWatch = true;
-  maxTemp = 0;
+  resetVariables();
   server.send(200, "text/plain", ""); 
 }
 
@@ -377,53 +354,43 @@ void timeToString(char* string, size_t size)  {
   seconds %= 3600;
   byte minutes = seconds / 60;
   seconds %= 60;
-  snprintf(string, size, "%dJ:%02dH:%02dM:%02dS", days, hours, minutes, seconds);
+  snprintf(string, size, "%dD:%02dH:%02dM:%02dS", days, hours, minutes, seconds);
 }
 // code to send the main web page
 // PAGE_MAIN is a large char defined in SuperMon.h
 void SendWebsite() {
   // you may have to play with this value, big pages need more porcessing time, and hence
   // a longer timeout that 200 ms
-  server.send(200, "text/html", PAGE_MAIN);
+  server.send(800, "text/html", PAGE_MAIN);
 }
 
 // code to send the main web page
 // I avoid string data types at all cost hence all the char mainipulation code
 void SendXML() {
-
   // Serial.println("sending xml");
-
   strcpy(XML, "<?xml version = '1.0'?>\n<Data>\n");
-
   // send level_XML
   sprintf(buf, "<G>%d</G>\n", level_XML);
   strcat(XML, buf);
-  
   // send temp_XML
   sprintf(buf, "<G>%4.1f</G>\n", temp_XML);
   strcat(XML, buf);
-
   // send feed_XML
-  sprintf(buf, "<G>%d</G>\n", feed_XML);
+  sprintf(buf, "<G>%d</G>\n", solid_XML);
   strcat(XML, buf);
-
   // send press_XML
   sprintf(buf, "<G>%f</G>\n", press_XML);
   strcat(XML, buf);
-
   // send tds_XML
   sprintf(buf, "<G>%d</G>\n", tds_XML);
   strcat(XML, buf);
-  
   // send SWITCH 1 status
-  
   if (buttonOneStatus) {
     strcat(XML, "<SW>1</SW>\n");
     }
       else {
     strcat(XML, "<SW>0</SW>\n");
     }
-  
   // send SWITCH 2 status
   if (buttonTwoStatus) {
     strcat(XML, "<SW>1</SW>\n");
@@ -431,15 +398,14 @@ void SendXML() {
     else {
         strcat(XML, "<SW>0</SW>\n");
     }
-
   // send SWITCH 3 status
-  if (buttonThreeStatus) {
+  if (buttonThreeStatus || digitalRead(19)) {
+    buttonThreeStatus = !buttonThreeStatus;
     strcat(XML, "<SW>1</SW>\n");
     }
     else {
         strcat(XML, "<SW>0</SW>\n");
     }
-
   // send SWITCH 4 status
   if (buttonFourStatus) {
     strcat(XML, "<SW>1</SW>\n");
@@ -447,51 +413,47 @@ void SendXML() {
     else {
         strcat(XML, "<SW>0</SW>\n");
     }
-    
   // send Status Indicator #1 (Liquid Level)
   sprintf(buf, "<SI>%d</SI>\n", statusIndicator1);
   strcat(XML, buf);
-
   // send Status Indicator #2 (Temperature)
   sprintf(buf, "<SI>%d</SI>\n", statusIndicator2);
   strcat(XML, buf);
-
   // send Status Indicator #3 (TDS Value)
   sprintf(buf, "<SI>%d</SI>\n", statusIndicator3);
   strcat(XML, buf);
-
   // send Status Indicator #4 (Feeder Level)
   sprintf(buf, "<SI>%d</SI>\n", statusIndicator4);
   strcat(XML, buf);
-
   // send datatable values for dashboard
-  
   sprintf(buf, "<DT>%4.1f</DT>\n", maxTemp);
   strcat(XML, buf);
   sprintf(buf, "<DT>%d</DT>\n", cpuTempVal);
   strcat(XML, buf);
   sprintf(buf, "<DT>%s</DT>\n", strTime);
   strcat(XML, buf);
-  
+  // End of XML file
   strcat(XML, "</Data>\n");
-  
   server.send(200, "text/xml", XML);
-  Serial.println(maxTemp);
-
-}
-
-// Function to calculate Feed level in FishFeeder Reservoir from the UART Waterproof distance sensor.
+  }
+// Function to calculate Liquid level from the UART Waterproof distance sensor connected to Serial2.
 float liquidCalib() {
-  tfmP.getData(tfDist);
+  tfmpLiquid.getData(tfDist);
   level_dist = map(tfDist,0,50,0,1300);
   if(level_dist >= 1300)  {level_dist = 1300; }
   delay(10); 
   return level_dist; 
 }
-
+// Function to calculate Solid level from the UART Waterproof distance sensor connected to Serial3.
+float solidCalib() {
+  tfmpSolid.getData(tfDist);
+  solid_dist = map(tfDist,0,50,0,100);
+  if(solid_dist >= 100)  {solid_dist = 100; }
+  delay(10); 
+  return solid_dist; 
+}
 // Function to calculate Liquid Temperature  using the DS18B20 Waterproof Temperature Sensor
 // (connected to pin 4) using a smoothing technic on a rolling average of last 10 readings.
-
 float ds18b20Calib() {
   sensors.requestTemperatures();
   tempObjecC = sensors.getTempC(tempSensor1);
@@ -500,7 +462,6 @@ float ds18b20Calib() {
   if (tempObjecC > 40) {tempObjecC = 40; }
   return tempObjecC;
 }
-
 void triggerCheck()
 {   
     // Liquid Level  
@@ -514,109 +475,127 @@ void triggerCheck()
         }
     if  (warnConsistEmpty > 10 && !senderOverride) {
         warnConsistEmpty=0;
-        /*HTTPClient http;
-        http.begin(serverName);
-        delay(500);
-        http.addHeader("Content-Type", "application/json");
-        String httpRequestData = "{\"value1\":\"" + String(level_XML) + "\"}";
-        int httpResponseCode = http.POST(httpRequestData);
-        smsLevelOverride = true;
-        http.end();*/
+          if  (!smsLevelOverride) { 
+          HTTPClient http;
+          http.begin(eventLiquid);
+          delay(500);
+          http.addHeader("Content-Type", "application/json");
+          String httpRequestData = "{\"value1\":\"" + String(level_XML) + "\"}";
+          int httpResponseCode = http.POST(httpRequestData);
+          smsLevelOverride = true;
+          http.end();
+          }
         }
         if (level_XML < 1099) { statusIndicator1 = 0;}
         if (level_XML > 1099) { statusIndicator1 = 1; }
 
     // Temperature Level
-    if  (temp_XML >= 32) {
+    if  (temp_XML >= 28) {
         tempConsistHot++;
         tempConsistCold=0;
         }
-    if  (temp_XML < 32) {
+    if  (temp_XML < 28) {
         tempConsistCold++;;
         tempConsistHot=0;
         }
     if  (tempConsistHot > 10 && !senderOverride) {
         tempConsistHot=0;
-       
-        /*char value2;
-        char value3;
-        char tempChar[7];                                                         // Temp as an array
-        tempString = String(tempObjecC);                                          // Convert temperature as float into String 
-        if  (!smsTempOverride) {                                                  // Only be notified once every hour 
-            tempString.toCharArray(tempChar, tempString.length());                // Convert temperature as String into char array
-            send_webhook(IFTTT_Event5,IFTTT_Key,tempChar,"value2","value3");
-            smsTempOverride = true; 
-            }*/
+        if  (!smsTempOverride) { 
+          HTTPClient http;
+          http.begin(eventTemp);
+          delay(500);
+          http.addHeader("Content-Type", "application/json");
+          String httpRequestData = "{\"value1\":\"" + String(temp_XML) + "\"}";
+          int httpResponseCode = http.POST(httpRequestData);
+          smsTempOverride = true;
+          http.end();
+          }
         }
-        if (temp_XML < 26) { statusIndicator2 = 1;}
+        if (temp_XML < 28) { statusIndicator2 = 1;}
         if (temp_XML >= 28) { statusIndicator2 = 0; }
+  
+    // SOLID LEVEL 
+    if  (solid_XML > 10) {
+        solidConsistFull++;
+        solidConsistLow=0;
+        }
+    if  (solid_XML <= 10) {
+        solidConsistLow++;
+        solidConsistFull=0;
+        }
+    if  (solidConsistLow > 10 && !senderOverride) {
+        solidConsistLow=0;
+          if  (!smsSolidOverride) { 
+          HTTPClient http;
+          http.begin(eventSolid);
+          delay(500);
+          http.addHeader("Content-Type", "application/json");
+          String httpRequestData = "{\"value1\":\"" + String(solid_XML) + "\"}";
+          int httpResponseCode = http.POST(httpRequestData);
+          smsSolidOverride = true;
+          http.end();
+          }
+        }
+        if (solid_XML <= 10) { statusIndicator4 = 0;}
+        if (solid_XML > 10) { statusIndicator4 = 1; }
 
-    
-    // TDS Water Quality Warning
-    /*if  (tdsValue > 500) {
+    // TDS Quality Warning
+    if  (tds_XML > 500) {
         tdsConsistHigh++;
         tdsConsistLow=0;
         }
-    if  (tdsValue <= 500) {
+    if  (tds_XML <= 500) {
         tdsConsistLow++;
         tdsConsistHigh=0;
         }
-    if  (tdsConsistHigh > 10 && !senderOverride && (stableTime > 60000)) {
-        char value1;
-        char value2;
-        char tdsChar[7];
-        tdsString = String(tdsValue);
-        if  (!smsTdsOverride) { 
-            tdsString.toCharArray(tdsChar, tdsString.length());                // Convert TDS value as String into char array                                                   
-            send_webhook(IFTTT_Event4,IFTTT_Key,tdsChar,"value2","value3");
-            smsTdsOverride = true;
-            }
-        }*/ 
-        if (tds_XML < 300) { statusIndicator3 = 1;}
-        if (tds_XML >= 300) { statusIndicator3 = 0; }
-    // FEEDER LEVEL 
-    /*if  (distance2 > 10) {
-        feedConsistFull++;
-        feedConsistLow=0;
+    if  (tdsConsistHigh > 10 && !senderOverride) {
+        tdsConsistHigh=0;
+          if  (!smsTdsOverride) { 
+          HTTPClient http;
+          http.begin(eventTds);
+          delay(500);
+          http.addHeader("Content-Type", "application/json");
+          String httpRequestData = "{\"value1\":\"" + String(tds_XML) + "\"}";
+          int httpResponseCode = http.POST(httpRequestData);
+          smsTdsOverride = true;
+          http.end();
+          }
         }
-    if  (distance2 <= 10) {
-        feedConsistLow++;
-        feedConsistFull=0;
-        }
-    if  (feedConsistLow > 10 && !senderOverride && (stableTime > 60000)) {
-        feedConsistLow=0;
-        char value2;
-        char value3;
-        char feedChar[7];                                                       
-        feedString = String(distance2);                                         // Convert Feed % as float into String 
-        if  (!smsFeedOverride) {                                                // Only be notified once every hour 
-            feedString.toCharArray(feedChar, feedString.length());              // Convert Feed as String into char array
-            //send_webhook(IFTTT_Event3,IFTTT_Key,feedChar,"value2","value3");
-            smsFeedOverride = true;   
-            } 
-        }*/
-        if (feed_XML < 10) { statusIndicator4 = 0;}
-        if (feed_XML > 10) { statusIndicator4 = 1; }
+        if (tds_XML < 500) { statusIndicator3 = 1;}
+        if (tds_XML >= 500) { statusIndicator3 = 0; }
+
         
 }
-
+void resetVariables() {
+  digitalWrite(19,HIGH);
+  if(buttonOneStatus) {buttonOneStatus = false;}
+  if(buttonTwoStatus) {buttonTwoStatus = false;}
+  if(buttonFourStatus){buttonFourStatus = false; senderOverride = false;}
+  smsSolidOverride, smsTempOverride, smsTdsOverride, smsLevelOverride, smsWarnOverride = false;  
+  digitalWrite(2,LOW);
+  digitalWrite(18, LOW);
+  digitalWrite(21, LOW);
+  startTime = millis();
+  resetStopWatch = true;
+  maxTemp = 0;
+}
 void printWifiStatus() {
 
   // print the SSID of the network you're attached to:
-  Serial.print("SSID: ");
-  Serial.println(WiFi.SSID());
+  //Serial.print("SSID: ");
+  //Serial.println(WiFi.SSID());
 
   // print your WiFi shield's IP address:
   ip = WiFi.localIP();
-  Serial.print("IP Address: ");
-  Serial.println(ip);
+  //Serial.print("IP Address: ");
+  //Serial.println(ip);
 
   // print the received signal strength:
   long rssi = WiFi.RSSI();
-  Serial.print("signal strength (RSSI):");
-  Serial.print(rssi);
-  Serial.println(" dBm");
+  //Serial.print("signal strength (RSSI):");
+  //Serial.print(rssi);
+  //Serial.println(" dBm");
   // print where to go in a browser:
-  Serial.print("Open http://");
-  Serial.println(ip);
+  //Serial.print("Open http://");
+  //Serial.println(ip);
 }
