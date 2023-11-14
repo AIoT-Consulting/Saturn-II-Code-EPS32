@@ -1,5 +1,3 @@
-// note R"KEYWORD( html page code )KEYWORD"; 
-// again I hate strings, so char is it and this method let's us write naturally
 
 const char PAGE_MAIN[] PROGMEM = R":::::(
 
@@ -534,7 +532,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                 <td width="2%";></td>
                 <td style="text-align: left" width="12%";><h4>&nbsp;Water Level:</h4><h4>&nbsp;TDS Value:</h4></td><td style="text-align: left" width="10%";><span id="dataTable5"> ...</span><span> gals</span><br><span id="dataTable6"> ...</span><span> ppm</span></td>
                 <td width="2%";></td>
-                <td style="text-align: left" width="12%";><h4>&nbsp;MCU Temp:</h4><h4>&nbsp;Timer:</h4></td><td style="text-align: left" width="18%";><span id="dataTable7"> ...</span><span> &#8451</span><br><span id="dataTable8"> ...</span></td>
+                <td style="text-align: left" width="12%";><h4>&nbsp;MCU Temp:</h4><h4>&nbsp;Timer:</h4></td><td style="text-align: left" width="18%";><span id="dataTable7"> ...</span><span> &#8451</span><br><span style="font-size: 8pt;" id="dataTable8"> ...</span></td>
             </tr>   
             </table>
             <table id="table_S">
@@ -759,7 +757,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
      }      
         // you may have to play with this value, big pages need more porcessing time, and hence
         // a longer timeout
-        setTimeout("process()",500);
+        setTimeout("process()",800);
      }
     
     </script>
