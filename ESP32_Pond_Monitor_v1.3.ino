@@ -1,24 +1,14 @@
 #include <WiFi.h>             // standard library
-#include <WebServer.h>        // standard library
+#include <WiFiManager.h>
+#include <Preferences.h>
 #include <SPI.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <TFMPlus.h>  // Include TFMini Plus Library v1.5.0
 #include <StopWatch.h>
-
+#include <Ticker.h>
 #include "web_interface_1.3.h"         // .h file that stores our webpage interface
 #include <HTTPClient.h>
-// here you post web pages to your homes intranet which will make page debugging easier
-// as you just need to refresh the browser as opposed to reconnection to the web server
-#define USE_INTRANET
-
-// replace this with your homes intranet connect parameters
-#define LOCAL_SSID "RatNet"
-#define LOCAL_PASS "P1nouche"
-
-// once  you are read to go live these settings are what you client will connect to
-#define AP_SSID "Pond"
-#define AP_PASS "Fish"
 
 // Individual SMS event triggers
 const char* eventLiquid = "https://maker.ifttt.com/trigger/Liquid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
@@ -26,15 +16,18 @@ const char* eventSolid = "https://maker.ifttt.com/trigger/Solid_Low/with/key/kg0
 const char* eventTemp = "https://maker.ifttt.com/trigger/Temp_High/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
 const char* eventTds = "https://maker.ifttt.com/trigger/Tds_High/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
 
+const char* eventIp = "Ip_Address";
+
 // Code to access internal CPU temperature 
 #ifdef __cplusplus
-extern "C" {
+  extern "C" {
 #endif
 uint8_t temprature_sens_read();
 #ifdef __cplusplus
 }
 #endif
 uint8_t temprature_sens_read();
+
 
 // variables to store measure data and sensor states
 int online = 0;
@@ -78,7 +71,8 @@ float previousTemp;
 
 // TDS SENSOR VARIABLES:
 int tds_XML = 0;
-#define VREF 5.0                                  // analog reference voltage(Volt) of the ADC
+float voltage = 3.3, ecValue, temperature = 25;
+#define VREF 3.3                                  // analog reference voltage(Volt) of the ADC
 #define SCOUNT  30                                // sum of sample point
 int analogBuffer[SCOUNT];                         // store the analog value in the array, read from ADC
 int analogBufferTemp[SCOUNT];
@@ -89,26 +83,27 @@ int tdsConsistHigh = 0;
 int tdsConsistLow = 0;
 
 // SOLID LEVEL VARIABLES
-uint8_t feed_buf[9] = {0};                                 // An array that holds data
+uint8_t feed_buf[9] = {0};                                
 int solid_XML = 0;
-int solid_dist = 0;                                         // The variable "distance2" will contain the distance value in millimeter from FishFeeder distance sensor
+int solid_dist = 0;                                        
 int solidLevelVal = 0;
 int solidConsistFull=0;
 int solidConsistLow=0;
 String solidString = "999";
 int soldiLevel; 
 
-// FILTER PRESSURE SENSOR VARIABLES:
-float press_XML = 0.0;
-float filterPressZero = 96.0;                      //analog reading of pressure transducer at 0psi
-float filterPressMax = 139.0;                      //analog reading of pressure transducer at 100psi
-float filterPresstransducermaxPSI = 5.0;           //psi value of transducer being used
-float filterPressVal = 0.0;                        //variable to store the value coming from the pressure transducer
-const int numFilterReadings = 10;
-int readIndexFilter = 0.0;
-float totalFilter = 0.0;
-float readingsFilter[numFilterReadings];
-float avgFilter = 0.0;
+// PRESSURE SENSOR VARIABLES:
+float press_XML = 0;
+int rawPress = 0;
+float pressZero = 170.0;                       //analog reading of pressure transducer at 0psi
+float pressMax = 1023.0;                       //analog reading of pressure transducer at 100psi
+float ratedMaxPSI = 10.0;                      //psi value of transducer being used
+const int numPressReadings = 10;
+int readIndexPress = 0.0;
+float totalPress = 0.0;
+float readingsPress[numPressReadings];
+float avgPress = 0.0;
+float pressure = 0;
 
 // MCU TTEMPERATURE VARIABLES
 int cpuTemp = 0;
@@ -128,6 +123,8 @@ bool buttonOne=false;
 bool buttonTwo=false;
 bool buttonThree=false;
 bool buttonFour=false;
+unsigned long buttonPressTime = 0;
+bool currentButtonState;
 
 // Status indicator varibales
 int statusIndicator1 = 0;
@@ -147,17 +144,13 @@ char strTime[18] = {0};
 // the XML array size needs to be bigger that your maximum expected size. 2048 is way too big for this example
 char XML[2048];
 
+// the IFTTT api key that will be passed by the WiFi Manager upon intial setup
+//const char* IFTTT_key;
+String IFTTT_key;
+bool key_Reset = false;
+
 // just some buffer holder for char operations
 char buf[32];
-
-// variable for the IP reported when you connect to your homes intranet (during debug mode)
-IPAddress Actual_IP;
-
-// definitions of your desired intranet created by the ESP32
-IPAddress PageIP(192, 168, 1, 1);
-IPAddress gateway(192, 168, 1, 1);
-IPAddress subnet(255, 255, 255, 0);
-IPAddress ip;
 
 WebServer server(80);
 TFMPlus tfmpLiquid;                                   // Create a TFMini Plus object for liquid level
@@ -165,7 +158,12 @@ TFMPlus tfmpSolid;                                    // Create a TFMini Plus ob
 OneWire oneWire(oneWireBus);                          // Setup a oneWire instance to communicate with any OneWire devices
 DallasTemperature sensors(&oneWire);                  // Pass our oneWire reference to Dallas Temperature sensor 
 StopWatch relayOne;
-
+//Ticker watchDogTick;
+Ticker ticker;
+Preferences ifttt;
+//volatile int watchDogCount = 0;
+#define TRIGGER_PIN 0
+                                    
 void IRAM_ATTR push_but1_ISR() {
   button_time = millis();
   if (button_time - last_button_time > 500) {
@@ -174,7 +172,6 @@ void IRAM_ATTR push_but1_ISR() {
     last_button_time = button_time;
     }
 }
-
 void IRAM_ATTR push_but2_ISR() {
   button_time = millis();
   if (button_time - last_button_time > 500) {
@@ -200,8 +197,8 @@ void IRAM_ATTR push_but4_ISR() {
     }
 }
 
-
 void setup() {
+  WiFi.mode(WIFI_STA);
   Serial.begin(115200);
   Serial1.begin(115200, SERIAL_8N1, 32, 33);
   Serial2.begin(115200, SERIAL_8N1, 16, 17);
@@ -212,62 +209,68 @@ void setup() {
   tfmpSolid.begin( &Serial1);
   tfmpSolid.sendCommand( SOFT_RESET, 0);
   delay(500);
+  
+  //watchDogTick.attach(1, isrWatchdog);
   sensors.begin();                                    // Start the DS18B20 sensor
+  pinMode(TRIGGER_PIN, INPUT_PULLUP);
   pinMode(2, OUTPUT);         // Pushbutton LED for Switch 1
   pinMode(18, OUTPUT);        // Pushbutton LED for Switch 2
+  pinMode(4, OUTPUT);         // WiFi Connection LED
   pinMode(19, OUTPUT);        // Pushbutton LED for RESET
   pinMode(21, OUTPUT);        // Pushbutton LED for OVERRIDE
+  pinMode(36,INPUT_PULLUP);   // Input Pin for TDS sensor
+  pinMode(34, INPUT_PULLUP);  // Input Pin for Pressure Sensor
   pinMode(25, INPUT_PULLUP);  // Input Pushbutton 1
   pinMode(26, INPUT_PULLUP);  // Input Pushbutton 2
   pinMode(27, INPUT_PULLUP);  // Input Pushbutton 3
   pinMode(14, INPUT_PULLUP);  // Input Pushbutton 4
+  adcAttachPin(36);
   attachInterrupt(25, push_but1_ISR, FALLING);
   attachInterrupt(26, push_but2_ISR, FALLING);
   attachInterrupt(27, push_but3_ISR, FALLING);
   attachInterrupt(14, push_but4_ISR, FALLING);
   // Initialize smoothing arrays to 0
   for (int thisReading = 0; thisReading < numCpuReadings; thisReading++) {
-    readingsFilter[thisReading] = 0.0;}
+    readingsCpuTemp[thisReading] = 0.0;}
+  for (int thisReading = 0; thisReading < numPressReadings; thisReading++) {
+    readingsPress[thisReading] = 0.0;}
   startTime = millis();
-  // if your web page or XML are large, you may not get a call back from the web page
-  // and the ESP will think something has locked up and reboot the ESP
-  // not sure I like this feature, actually I kinda hate it
-  // disable watch dog timer 0
-  disableCore0WDT();
-
-  // maybe disable watch dog timer 1 if needed
-  //  disableCore1WDT();
-
-  // just an update to progress
-  //Serial.println("starting server");
-
-  // if you have this #define USE_INTRANET,  you will connect to your home intranet, again makes debugging easier
-#ifdef USE_INTRANET
-  WiFi.begin(LOCAL_SSID, LOCAL_PASS);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    //Serial.print(".");
+  ticker.attach(0.9, tick);
+  WiFiManager wm;
+  wm.setAPCallback(configModeCallback);
+  wm.setClass("invert"); 
+  wm.setScanDispPerc(true); 
+  wm.setMinimumSignalQuality(40);
+  wm.setConfigPortalTimeout(120);
+  //wm.resetSettings();
+  std::vector<const char *> menu = {"wifi","info","update","exit"};
+  wm.setMenu(menu);
+  WiFiManagerParameter ifttt_api_key("ifttt_key", "Enter you IFTTT API Key Here", "", 50);
+  wm.addParameter(&ifttt_api_key);
+  if(!wm.autoConnect("Saturn V")) {
+    Serial.println("failed to connect and hit timeout");
+    //rest and try again, or maybe put it in deep sleep
+    ESP.restart();
+    delay(1000);
   }
-  //Serial.print("IP address: "); 
-  //Serial.println(WiFi.localIP());
-  Actual_IP = WiFi.localIP();
-#endif
-
-  // if you don't have #define USE_INTRANET, here's where you will creat and access point
-  // an intranet with no internet connection. But Clients can connect to your intranet and see
-  // the web page you are about to serve up
-#ifndef USE_INTRANET
-  WiFi.softAP(AP_SSID, AP_PASS);
-  delay(100);
-  WiFi.softAPConfig(PageIP, gateway, subnet);
-  delay(100);
-  Actual_IP = WiFi.softAPIP();
-  //Serial.print("IP address: "); 
-  //Serial.println(Actual_IP);
-#endif
-
-  printWifiStatus();
-  
+  else  {
+    ifttt.begin("credentials", false);
+    if(ifttt.getBool("key_Reset")) {
+      ifttt.putString("IFTTT_key", ifttt_api_key.getValue());
+      ifttt.putBool("key_Reset", false);
+      IFTTT_key = ifttt.getString("IFTTT_key", "");
+      ip_Add_Trigger();
+    }
+    //Serial.println("Connected...");    
+    //Serial.print("IP Address: ");
+    //Serial.println(WiFi.localIP());
+    //IFTTT_key = ifttt.getString("IFTTT_key", "");
+    //Serial.print("IFTTT API Key is: ");
+    //Serial.println(IFTTT_key);
+    ifttt.end();
+    ticker.detach();
+    digitalWrite(4, HIGH);
+  }
   server.on("/", SendWebsite);
   server.on("/xml", SendXML);
   server.on("/buttonOne", processButtonOne);
@@ -278,16 +281,31 @@ void setup() {
 }
 
 void loop() {
+  // Process the WiFi Reset when WiFi Reset button is Press for more then 5 Sec.
+  currentButtonState = digitalRead(TRIGGER_PIN);
+  if (!currentButtonState) {
+    buttonPressTime = millis();
+    while (!digitalRead(TRIGGER_PIN));
+    if (millis() - buttonPressTime > 5000) {
+      WiFiManager wm; 
+      wm.resetSettings();
+      ifttt.begin("credentials", false);
+      ifttt.putBool("key_Reset", true);       // This will set the value stored in memory for the key_Reset variabe to TRUE
+      ifttt.remove("IFTTT_key");              // This will remove the current current IFTTT API key
+      ifttt.end();
+      ESP.restart();} 
+  }
   
-  triggerCheck();
+  //watchDogCount = 0;
+  //triggerCheck();
   if ((millis() - SensorUpdate) >= 1000) {
     SensorUpdate = millis();
-    level_XML = liquidCalib();
-    temp_XML = ds18b20Calib();
-    solid_XML = solidCalib();
-    press_XML = 2.3;
-    tds_XML = 350;
+    //level_XML = liquidCalib();
+    //temp_XML = ds18b20Calib();
+    //solid_XML = solidCalib();
+   // press_XML = pressCalib();
     cpuTempVal = cpuTempCalib();
+    //tds_XML = tdsCalib();
   }
   server.handleClient();
   if(buttonThreeStatus) {delay(1000); buttonThreeStatus = false; digitalWrite(19, LOW);} 
@@ -296,18 +314,6 @@ void loop() {
     timeToString(strTime, sizeof(strTime));
     lastTimeUpdateMillis = millis();;
   } 
-}
-
-int cpuTempCalib() {
-  cpuTemp = (temprature_sens_read() - 32) / 1.8;
-  //The following code is to calculate the rolling average of the last 10 readings...
-  totalCpuTemp = totalCpuTemp - readingsCpuTemp[readIndexCpu];
-  readingsCpuTemp[readIndexCpu] = cpuTemp;
-  totalCpuTemp = totalCpuTemp + readingsCpuTemp[readIndexCpu];
-  readIndexCpu = readIndexCpu + 1;
-  if (readIndexCpu >= numCpuReadings) { readIndexCpu = 0; }
-  avgCpuTemp = totalCpuTemp / numCpuReadings;
-  return avgCpuTemp;
 }
 
 void processButtonOne() {
@@ -367,7 +373,6 @@ void SendWebsite() {
 // code to send the main web page
 // I avoid string data types at all cost hence all the char mainipulation code
 void SendXML() {
-  // Serial.println("sending xml");
   strcpy(XML, "<?xml version = '1.0'?>\n<Data>\n");
   // send level_XML
   sprintf(buf, "<G>%d</G>\n", level_XML);
@@ -379,7 +384,7 @@ void SendXML() {
   sprintf(buf, "<G>%d</G>\n", solid_XML);
   strcat(XML, buf);
   // send press_XML
-  sprintf(buf, "<G>%f</G>\n", press_XML);
+  sprintf(buf, "<G>%4.1f</G>\n", press_XML);
   strcat(XML, buf);
   // send tds_XML
   sprintf(buf, "<G>%d</G>\n", tds_XML);
@@ -434,6 +439,7 @@ void SendXML() {
   strcat(XML, buf);
   // End of XML file
   strcat(XML, "</Data>\n");
+  //Serial.println(XML);
   server.send(200, "text/xml", XML);
   }
 // Function to calculate Liquid level from the UART Waterproof distance sensor connected to Serial2.
@@ -444,6 +450,22 @@ float liquidCalib() {
   delay(10); 
   return level_dist; 
 }
+// Function to calculate an average pressure value over specified number of samples (to limit fluctuations) and to convert 
+// values from the 100 PSI pressure sensor (connected to analog pin 5) to accurately reflect the circuit environment.
+float pressCalib()  {
+  rawPress = analogRead(34); 
+  pressure = ((rawPress-pressZero)*ratedMaxPSI)/(pressMax-pressZero); 
+  if (pressure >= 5) {pressure = 5;}
+  if (pressure <= 0.5) {pressure = 0;} 
+  //The following code is to calculate the rolling average of the last 10 readings...
+  totalPress = totalPress - readingsPress[readIndexPress];
+  readingsPress[readIndexPress] = pressure;
+  totalPress = totalPress + readingsPress[readIndexPress];
+  readIndexPress = readIndexPress + 1;
+  if (readIndexPress >= numPressReadings) { readIndexPress = 0; }
+  avgPress = totalPress / numPressReadings;
+  return avgPress;
+}
 // Function to calculate Solid level from the UART Waterproof distance sensor connected to Serial3.
 float solidCalib() {
   tfmpSolid.getData(tfDist);
@@ -453,7 +475,6 @@ float solidCalib() {
   return solid_dist; 
 }
 // Function to calculate Liquid Temperature  using the DS18B20 Waterproof Temperature Sensor
-// (connected to pin 4) using a smoothing technic on a rolling average of last 10 readings.
 float ds18b20Calib() {
   sensors.requestTemperatures();
   tempObjecC = sensors.getTempC(tempSensor1);
@@ -461,6 +482,52 @@ float ds18b20Calib() {
   if (tempObjecC < -10) {tempObjecC = -10;}
   if (tempObjecC > 40) {tempObjecC = 40; }
   return tempObjecC;
+}
+// Function to calculate liquid quality TDS (Total Dissolved Solids) in ppm for water
+float tdsCalib() {
+    analogBuffer[analogBufferIndex] = analogRead(36);    //read the analog value and store into the buffer
+    analogBufferIndex++;
+    if(analogBufferIndex == SCOUNT){ 
+      analogBufferIndex = 0;
+    }
+    for(copyIndex=0; copyIndex < SCOUNT; copyIndex++){
+      analogBufferTemp[copyIndex] = analogBuffer[copyIndex];
+      averageVoltage = getMedianNum(analogBufferTemp,SCOUNT) * (float)VREF / 4096.0;
+      float compensationCoefficient = 1.0+0.02*(temperature-25.0);
+      float compensationVoltage=averageVoltage/compensationCoefficient;
+      tdsValue = (133.42*compensationVoltage*compensationVoltage*compensationVoltage - 255.86*compensationVoltage*compensationVoltage + 857.39*compensationVoltage)*0.5;
+      if(tdsValue < 0)  {tdsValue = 0;}
+    }
+  return tdsValue;
+}
+// Used for the tdsCalib() function (median filtering algorithm)
+int getMedianNum(int bArray[], int iFilterLen){
+  int bTab[iFilterLen];
+  for (byte i = 0; i<iFilterLen; i++)
+  bTab[i] = bArray[i];
+  int i, j, bTemp;
+  for (j = 0; j < iFilterLen - 1; j++) {
+    for (i = 0; i < iFilterLen - j - 1; i++) {
+      if (bTab[i] > bTab[i + 1]) {bTemp = bTab[i]; bTab[i] = bTab[i + 1]; bTab[i + 1] = bTemp;}
+    }
+  }
+  if ((iFilterLen & 1) > 0){bTemp = bTab[(iFilterLen - 1) / 2];
+  } else {
+    bTemp = (bTab[iFilterLen / 2] + bTab[iFilterLen / 2 - 1]) / 2;
+  }
+  return bTemp;
+}
+
+int cpuTempCalib() {
+  cpuTemp = (temprature_sens_read() - 32) / 1.8;
+  //The following code is to calculate the rolling average of the last 10 readings...
+  totalCpuTemp = totalCpuTemp - readingsCpuTemp[readIndexCpu];
+  readingsCpuTemp[readIndexCpu] = cpuTemp;
+  totalCpuTemp = totalCpuTemp + readingsCpuTemp[readIndexCpu];
+  readIndexCpu = readIndexCpu + 1;
+  if (readIndexCpu >= numCpuReadings) { readIndexCpu = 0; }
+  avgCpuTemp = totalCpuTemp / numCpuReadings;
+  return avgCpuTemp;
 }
 void triggerCheck()
 {   
@@ -579,23 +646,36 @@ void resetVariables() {
   resetStopWatch = true;
   maxTemp = 0;
 }
-void printWifiStatus() {
-
-  // print the SSID of the network you're attached to:
-  //Serial.print("SSID: ");
-  //Serial.println(WiFi.SSID());
-
-  // print your WiFi shield's IP address:
-  ip = WiFi.localIP();
-  //Serial.print("IP Address: ");
-  //Serial.println(ip);
-
-  // print the received signal strength:
-  long rssi = WiFi.RSSI();
-  //Serial.print("signal strength (RSSI):");
-  //Serial.print(rssi);
-  //Serial.println(" dBm");
-  // print where to go in a browser:
-  //Serial.print("Open http://");
-  //Serial.println(ip);
+void ip_Add_Trigger() {
+          String url = "https://maker.ifttt.com/trigger/" + String(eventIp) + "/with/key/" + String(IFTTT_key);
+          HTTPClient http;
+          http.begin(url);
+          delay(500);
+          http.addHeader("Content-Type", "application/json");
+          String httpRequestData = "{\"value1\":\"" + WiFi.localIP().toString() + "\"}";
+          int httpResponseCode = http.POST(httpRequestData);
+          smsSolidOverride = true;
+          http.end();
+          }
+void tick()
+{
+  digitalWrite(4, !digitalRead(4));    
 }
+void configModeCallback (WiFiManager *myWiFiManager) {
+  Serial.println("Entered config mode");
+  Serial.println(WiFi.softAPIP());
+  //if you used auto generated SSID, print it
+  Serial.println(myWiFiManager->getConfigPortalSSID());
+  //entered config mode, make led toggle faster
+  ticker.attach(0.2, tick);
+}
+
+/*
+void isrWatchdog()  {
+  watchDogCount++;
+  if(watchDogCount == 60)  {
+    Serial.println();
+    Serial.println("The WatchDog has been fired....");
+    ESP.restart();
+  }
+}*/
