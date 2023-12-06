@@ -15,7 +15,6 @@ const char* eventLiquid = "https://maker.ifttt.com/trigger/Liquid_Low/with/key/k
 const char* eventSolid = "https://maker.ifttt.com/trigger/Solid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
 const char* eventTemp = "https://maker.ifttt.com/trigger/Temp_High/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
 const char* eventTds = "https://maker.ifttt.com/trigger/Tds_High/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
-
 const char* eventIp = "Ip_Address";
 
 // Code to access internal CPU temperature 
@@ -176,7 +175,7 @@ void IRAM_ATTR push_but2_ISR() {
   button_time = millis();
   if (button_time - last_button_time > 500) {
       buttonTwoStatus=!buttonTwoStatus;
-      digitalWrite(18, buttonTwoStatus); 
+      digitalWrite(5, buttonTwoStatus); 
       last_button_time = button_time;
     }
 }
@@ -192,7 +191,7 @@ void IRAM_ATTR push_but4_ISR() {
   if (button_time - last_button_time > 500) {
       buttonFourStatus = !buttonFourStatus;
       senderOverride = buttonFourStatus;
-      digitalWrite(21, buttonFourStatus); 
+      digitalWrite(19, buttonFourStatus); 
       last_button_time = button_time;
     }
 }
@@ -214,10 +213,10 @@ void setup() {
   sensors.begin();                                    // Start the DS18B20 sensor
   pinMode(TRIGGER_PIN, INPUT_PULLUP);
   pinMode(2, OUTPUT);         // Pushbutton LED for Switch 1
-  pinMode(18, OUTPUT);        // Pushbutton LED for Switch 2
+  pinMode(5, OUTPUT);        // Pushbutton LED for Switch 2
   pinMode(4, OUTPUT);         // WiFi Connection LED
-  pinMode(19, OUTPUT);        // Pushbutton LED for RESET
-  pinMode(21, OUTPUT);        // Pushbutton LED for OVERRIDE
+  pinMode(18, OUTPUT);        // Pushbutton LED for RESET
+  pinMode(19, OUTPUT);        // Pushbutton LED for OVERRIDE
   pinMode(36,INPUT_PULLUP);   // Input Pin for TDS sensor
   pinMode(34, INPUT_PULLUP);  // Input Pin for Pressure Sensor
   pinMode(25, INPUT_PULLUP);  // Input Pushbutton 1
@@ -297,18 +296,18 @@ void loop() {
   }
   
   //watchDogCount = 0;
-  //triggerCheck();
-  if ((millis() - SensorUpdate) >= 1000) {
+  triggerCheck();
+  if ((millis() - SensorUpdate) >= 500) {
     SensorUpdate = millis();
-    //level_XML = liquidCalib();
-    //temp_XML = ds18b20Calib();
-    //solid_XML = solidCalib();
-   // press_XML = pressCalib();
+    level_XML = liquidCalib();
+    temp_XML = ds18b20Calib();
+    solid_XML = solidCalib();
+    press_XML = pressCalib();
     cpuTempVal = cpuTempCalib();
-    //tds_XML = tdsCalib();
+    tds_XML = tdsCalib();
   }
   server.handleClient();
-  if(buttonThreeStatus) {delay(1000); buttonThreeStatus = false; digitalWrite(19, LOW);} 
+  if(buttonThreeStatus) {delay(1000); buttonThreeStatus = false; digitalWrite(18, LOW);} 
   // Timer opereations
   if(millis() - lastTimeUpdateMillis > 1000) {
     timeToString(strTime, sizeof(strTime));
@@ -326,7 +325,7 @@ void processButtonOne() {
 void processButtonTwo() {
 
   buttonTwoStatus=!buttonTwoStatus;
-  digitalWrite(18, buttonTwoStatus);
+  digitalWrite(5, buttonTwoStatus);
   server.send(200, "text/plain", ""); 
 }
 
@@ -339,7 +338,7 @@ void processButtonFour() {
 
   buttonFourStatus=!buttonFourStatus;
   senderOverride = buttonFourStatus;
-  digitalWrite(21, buttonFourStatus);
+  digitalWrite(19, buttonFourStatus);
   server.send(200, "text/plain", ""); 
 }
 
@@ -404,7 +403,7 @@ void SendXML() {
         strcat(XML, "<SW>0</SW>\n");
     }
   // send SWITCH 3 status
-  if (buttonThreeStatus || digitalRead(19)) {
+  if (buttonThreeStatus || digitalRead(18)) {
     buttonThreeStatus = !buttonThreeStatus;
     strcat(XML, "<SW>1</SW>\n");
     }
@@ -542,7 +541,7 @@ void triggerCheck()
         }
     if  (warnConsistEmpty > 10 && !senderOverride) {
         warnConsistEmpty=0;
-          if  (!smsLevelOverride) { 
+          /*if  (!smsLevelOverride) { 
           HTTPClient http;
           http.begin(eventLiquid);
           delay(500);
@@ -551,7 +550,7 @@ void triggerCheck()
           int httpResponseCode = http.POST(httpRequestData);
           smsLevelOverride = true;
           http.end();
-          }
+          }*/
         }
         if (level_XML < 1099) { statusIndicator1 = 0;}
         if (level_XML > 1099) { statusIndicator1 = 1; }
@@ -567,7 +566,7 @@ void triggerCheck()
         }
     if  (tempConsistHot > 10 && !senderOverride) {
         tempConsistHot=0;
-        if  (!smsTempOverride) { 
+        /*if  (!smsTempOverride) { 
           HTTPClient http;
           http.begin(eventTemp);
           delay(500);
@@ -576,7 +575,7 @@ void triggerCheck()
           int httpResponseCode = http.POST(httpRequestData);
           smsTempOverride = true;
           http.end();
-          }
+          }*/
         }
         if (temp_XML < 28) { statusIndicator2 = 1;}
         if (temp_XML >= 28) { statusIndicator2 = 0; }
@@ -592,7 +591,7 @@ void triggerCheck()
         }
     if  (solidConsistLow > 10 && !senderOverride) {
         solidConsistLow=0;
-          if  (!smsSolidOverride) { 
+          /*if  (!smsSolidOverride) { 
           HTTPClient http;
           http.begin(eventSolid);
           delay(500);
@@ -601,7 +600,7 @@ void triggerCheck()
           int httpResponseCode = http.POST(httpRequestData);
           smsSolidOverride = true;
           http.end();
-          }
+          }*/
         }
         if (solid_XML <= 10) { statusIndicator4 = 0;}
         if (solid_XML > 10) { statusIndicator4 = 1; }
@@ -617,7 +616,7 @@ void triggerCheck()
         }
     if  (tdsConsistHigh > 10 && !senderOverride) {
         tdsConsistHigh=0;
-          if  (!smsTdsOverride) { 
+          /*if  (!smsTdsOverride) { 
           HTTPClient http;
           http.begin(eventTds);
           delay(500);
@@ -626,7 +625,7 @@ void triggerCheck()
           int httpResponseCode = http.POST(httpRequestData);
           smsTdsOverride = true;
           http.end();
-          }
+          }*/
         }
         if (tds_XML < 500) { statusIndicator3 = 1;}
         if (tds_XML >= 500) { statusIndicator3 = 0; }
@@ -634,14 +633,14 @@ void triggerCheck()
         
 }
 void resetVariables() {
-  digitalWrite(19,HIGH);
+  digitalWrite(18,HIGH);
   if(buttonOneStatus) {buttonOneStatus = false;}
   if(buttonTwoStatus) {buttonTwoStatus = false;}
   if(buttonFourStatus){buttonFourStatus = false; senderOverride = false;}
   smsSolidOverride, smsTempOverride, smsTdsOverride, smsLevelOverride, smsWarnOverride = false;  
   digitalWrite(2,LOW);
-  digitalWrite(18, LOW);
-  digitalWrite(21, LOW);
+  digitalWrite(5, LOW);
+  digitalWrite(19, LOW);
   startTime = millis();
   resetStopWatch = true;
   maxTemp = 0;
