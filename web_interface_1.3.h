@@ -24,6 +24,16 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
         vertical-align:top;
         top: 3px;
     }
+    .foot {
+        font-family: "Arial", "Verdana", sans-serif;
+        font-size: 20px;
+        position: relative;
+        height:   30px;
+        text-align: center;   
+        color: darkgray;
+        line-height: 20px;
+        padding: 25px;
+    }
     h1 {
       margin:0;
       padding:0;
@@ -301,6 +311,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       margin-right: auto;
       background: rgba(225,225,225,0.75);
       border-radius: 50px;
+      padding: 40px 40px;
       width: 50%;
       height: auto;
       text-align: center;
@@ -333,7 +344,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-font-title-style="bolder"
                     data-font-title-size="25"
                     data-color-title="black"
-                    data-value="50"
+                    data-value="0"
                     data-value-Int="1"
                     data-value-Dec="1"
                     data-animate-on-init="true"
@@ -438,7 +449,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-title="Air Pump Press"
                     data-font-title-style="bolder"
                     data-color-title="black"
-                    data-value="5"
+                    data-value="0"
                     data-value-Int="1"
                     data-value-Dec="1"
                     data-animate-on-init="true"
@@ -505,7 +516,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                             { "from": 400, "to": 500, "color": "rgba(132, 130, 0,.75)" },
                             { "from": 500, "to": 600, "color": "rgba(123, 37, 0,.75)" }                 
                             ]'
-                            data-value="500"
+                            data-value="0"
                             data-value-Int="1"
                             data-value-Dec="0"
                             data-min-value="0"
@@ -639,7 +650,6 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       // Gauge 2 Liquid Temperature
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[1].firstChild.nodeValue;
-      
       document.getElementById("gauge_2").setAttribute("data-value", message);
       document.getElementById("dataTable1").innerHTML = message;
       
@@ -657,7 +667,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[4].firstChild.nodeValue;
       document.getElementById("gauge_5").setAttribute("data-value", message);
-      
+      document.getElementById("dataTable6").innerHTML = message;
       // Switch 1
       if (this.responseXML.getElementsByTagName('SW')[0].childNodes[0].nodeValue === "1") {         
                 document.SW_form.SW1.checked = true;
@@ -732,7 +742,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[0].firstChild.nodeValue;
       document.getElementById("dataTable2").innerHTML = message;
-            
+
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[1].firstChild.nodeValue;
       document.getElementById("dataTable7").innerHTML = message;
