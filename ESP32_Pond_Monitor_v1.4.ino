@@ -56,9 +56,9 @@ float avgDist1 = 0;
 float duration1;   
 
 // TEMP SENSOR VARIABLES:
+#define ONE_WIRE_BUS 15
 float temp_XML = 0;
-const int oneWireBus = 4;
-byte tempSensor1[] = {0x28, 0xFF, 0xAF, 0x82, 0x0E, 0x00, 0x00, 0x3E};  // Unique DS18B20 address - need to change this for each sensor
+byte tempSensor1[] = {0x28, 0xAA, 0x90, 0xAD, 0x0F, 0x00, 0x00, 0x51};  // Unique DS18B20 address - need to change this for each sensor
 int tempConsistHot=0;
 int tempConsistCold=0;
 float tempObjecC = 0.0;
@@ -66,7 +66,7 @@ float tempAmbientC = 23.7;
 float maxTemp=0;
 String tempString = "999";              
 float pondTempVal = 0.0;
-float previousTemp;
+float previousTemp = 0.0;
 
 // TDS SENSOR VARIABLES:
 int tds_XML = 0;
@@ -152,7 +152,7 @@ char buf[32];
 WebServer server(80);
 TFMPlus tfmpLiquid;                                   // Create a TFMini Plus object for liquid level
 TFMPlus tfmpSolid;                                    // Create a TFMini Plus object for solid level
-OneWire oneWire(oneWireBus);                          // Setup a oneWire instance to communicate with any OneWire devices
+OneWire oneWire(ONE_WIRE_BUS);                        // Setup a oneWire instance to communicate with any OneWire devices
 DallasTemperature sensors(&oneWire);                  // Pass our oneWire reference to Dallas Temperature sensor 
 StopWatch relayOne;
 //Ticker watchDogTick;
@@ -211,6 +211,7 @@ void setup() {
   pinMode(2, OUTPUT);         // Pushbutton LED for Switch 1
   pinMode(5, OUTPUT);         // Pushbutton LED for Switch 2
   pinMode(4, OUTPUT);         // WiFi Connection LED
+  pinMode(15, INPUT);         // For OneWire Bus
   pinMode(19, OUTPUT);        // Pushbutton LED for RESET
   pinMode(21, OUTPUT);        // Pushbutton LED for OVERRIDE
   pinMode(36,INPUT_PULLUP);   // Input Pin for TDS sensor
@@ -280,7 +281,7 @@ void loop() {
   if ((millis() - SensorUpdate) >= 1000) {
     SensorUpdate = millis();
     //level_XML = liquidCalib();
-    //temp_XML = ds18b20Calib();
+    temp_XML = ds18b20Calib();
     //solid_XML = solidCalib();
    // press_XML = pressCalib();
     cpuTempVal = cpuTempCalib();
@@ -455,8 +456,10 @@ float solidCalib() {
 }
 // Function to calculate Liquid Temperature  using the DS18B20 Waterproof Temperature Sensor
 float ds18b20Calib() {
+  previousTemp = tempObjecC;
   sensors.requestTemperatures();
   tempObjecC = sensors.getTempC(tempSensor1);
+  if(tempObjecC == -127) {tempObjecC = previousTemp; }
   if(tempObjecC > maxTemp) {maxTemp = tempObjecC; }
   if (tempObjecC < -10) {tempObjecC = -10;}
   if (tempObjecC > 40) {tempObjecC = 40; }
