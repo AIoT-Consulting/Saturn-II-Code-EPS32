@@ -63,7 +63,8 @@ int tempConsistHot=0;
 int tempConsistCold=0;
 float tempObjecC = 0.0;
 float tempAmbientC = 23.7;
-float maxTemp=0;
+float maxTemp=0.0;
+int maxTempCount=0;
 String tempString = "999";              
 float pondTempVal = 0.0;
 float previousTemp = 0.0;
@@ -460,7 +461,13 @@ float ds18b20Calib() {
   sensors.requestTemperatures();
   tempObjecC = sensors.getTempC(tempSensor1);
   if(tempObjecC == -127) {tempObjecC = previousTemp; }
-  if(tempObjecC > maxTemp) {maxTemp = tempObjecC; }
+  if(tempObjecC > maxTemp) {
+    maxTempCount++;
+      if(maxTempCount > 5)  {
+        maxTemp = tempObjecC;
+        maxTempCount = 0;
+      }
+  }
   if (tempObjecC < -10) {tempObjecC = -10;}
   if (tempObjecC > 40) {tempObjecC = 40; }
   return tempObjecC;
