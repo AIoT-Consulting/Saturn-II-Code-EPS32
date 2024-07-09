@@ -1,5 +1,6 @@
 #include <WiFi.h>             // standard library
 #include <WiFiManager.h>
+#include <WebServer.h>
 #include <SPI.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -8,7 +9,7 @@
 #include <Ticker.h>
 #include "web_interface_1.3.h"         // .h file that stores our webpage interface
 #include <HTTPClient.h>
-
+#include <Smoothed.h>
 // Individual SMS event triggers
 const char* eventLiquid = "https://maker.ifttt.com/trigger/Liquid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
 const char* eventSolid = "https://maker.ifttt.com/trigger/Solid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
@@ -38,22 +39,25 @@ bool LED0 = false, SomeOutput = false;
 uint32_t SensorUpdate = 0;
 
 // LIQUID LEVEL VARIABLES
+byte hdr, data_h, data_l, chksum, check;
 int level_XML = 0;
 int level_dist = 0;
-int16_t tfDist = 0;                                        
+int16_t tfDist1 = 0;                                        
 int pondLevelVal = 0; 
 int levelConsistFull = 0;
 int levelConsistEmpty = 0;
 int warnConsistFull = 0;
 int warnConsistEmpty = 0;
-float distance1 = 0.0;                               
+unsigned int distance1;                              
 String lvlString = "999";
 const int numDist1Readings = 5;
 int readingsDist1[numDist1Readings];
 int readIndexDist1 = 0;                 
 unsigned long totalDist1 = 0;                   
 float avgDist1 = 0;
-float duration1;   
+float duration1;  
+unsigned char data[4] = {};
+int sum;
 
 // TEMP SENSOR VARIABLES:
 #define ONE_WIRE_BUS 15
@@ -85,7 +89,8 @@ int tdsConsistLow = 0;
 // SOLID LEVEL VARIABLES
 uint8_t feed_buf[9] = {0};                                
 int solid_XML = 0;
-int solid_dist = 0;                                        
+int solid_dist = 0; 
+int16_t tfDist2 = 0;                                         
 int solidLevelVal = 0;
 int solidConsistFull=0;
 int solidConsistLow=0;
@@ -93,17 +98,22 @@ String solidString = "999";
 int soldiLevel; 
 
 // PRESSURE SENSOR VARIABLES:
-float press_XML = 0;
-int rawPress = 0;
-float pressZero = 170.0;                       //analog reading of pressure transducer at 0psi
-float pressMax = 1023.0;                       //analog reading of pressure transducer at 100psi
+float baselineVoltageAir = 0.024;
+float baselineVoltageLiqu = 0.5;
+float airPress_XML = 0;
+float liquPress_XML = 0;
+float rawPress = 0.0;
+float pressZero = 450.0;                       //analog reading of pressure transducer at 0psi
+float pressMax = 4096.0;                       //analog reading of pressure transducer at 10psi
 float ratedMaxPSI = 10.0;                      //psi value of transducer being used
-const int numPressReadings = 10;
+const int numPressReadings = 5;
 int readIndexPress = 0.0;
 float totalPress = 0.0;
 float readingsPress[numPressReadings];
 float avgPress = 0.0;
-float pressure = 0;
+float airPressure = 0;
+float airPressVolts = 0.0;
+float liquPressure = 0;
 
 // MCU TTEMPERATURE VARIABLES
 int cpuTemp = 0;
@@ -151,6 +161,7 @@ char IFTTT[50];
 char buf[32];
 
 WebServer server(80);
+Smoothed <float> Liquid_Sensor_Smoothing;
 TFMPlus tfmpLiquid;                                   // Create a TFMini Plus object for liquid level
 TFMPlus tfmpSolid;                                    // Create a TFMini Plus object for solid level
 OneWire oneWire(ONE_WIRE_BUS);                        // Setup a oneWire instance to communicate with any OneWire devices
@@ -197,15 +208,16 @@ void IRAM_ATTR push_but4_ISR() {
 void setup() {
   WiFi.mode(WIFI_STA);
   Serial.begin(115200);
+  delay(200);
   Serial1.begin(115200, SERIAL_8N1, 32, 33);
-  Serial2.begin(115200, SERIAL_8N1, 16, 17);
-  delay(20);
-  tfmpLiquid.begin( &Serial2);
-  tfmpLiquid.sendCommand( SOFT_RESET, 0);
-  delay(500);
   tfmpSolid.begin( &Serial1);
   tfmpSolid.sendCommand( SOFT_RESET, 0);
-  delay(500);
+  delay(200);
+  Serial2.begin(115200, SERIAL_8N1, 16, 17);  
+  tfmpLiquid.begin( &Serial2);
+  tfmpLiquid.sendCommand( SOFT_RESET, 0);
+  Liquid_Sensor_Smoothing.begin(SMOOTHED_AVERAGE, 10);
+
   //watchDogTick.attach(1, isrWatchdog);
   sensors.begin();                                    // Start the DS18B20 sensor
   pinMode(TRIGGER_PIN, INPUT_PULLUP);
@@ -213,15 +225,18 @@ void setup() {
   pinMode(5, OUTPUT);         // Pushbutton LED for Switch 2
   pinMode(4, OUTPUT);         // WiFi Connection LED
   pinMode(15, INPUT);         // For OneWire Bus
+  pinMode(17, OUTPUT);
+  digitalWrite(17, LOW);
   pinMode(19, OUTPUT);        // Pushbutton LED for RESET
   pinMode(21, OUTPUT);        // Pushbutton LED for OVERRIDE
-  pinMode(36,INPUT_PULLUP);   // Input Pin for TDS sensor
-  pinMode(34, INPUT_PULLUP);  // Input Pin for Pressure Sensor
+  pinMode(36,INPUT_PULLUP);   // Input Pin for Air Pressure sensor
+  pinMode(35,INPUT_PULLUP);   // Input Pin for TDS sensor
+  //adcAttachPin(35);
+  pinMode(39, INPUT_PULLUP);  // Input Pin for Liquid Pressure Sensor
   pinMode(25, INPUT_PULLUP);  // Input Pushbutton 1
   pinMode(26, INPUT_PULLUP);  // Input Pushbutton 2
   pinMode(27, INPUT_PULLUP);  // Input Pushbutton 3
   pinMode(14, INPUT_PULLUP);  // Input Pushbutton 4
-  adcAttachPin(36);
   attachInterrupt(25, push_but1_ISR, FALLING);
   attachInterrupt(26, push_but2_ISR, FALLING);
   attachInterrupt(27, push_but3_ISR, FALLING);
@@ -257,7 +272,7 @@ void setup() {
     Serial.println(ifttt_api_key.getValue());
     ticker.detach();
     digitalWrite(4, HIGH);
-    ip_Add_Trigger();
+    //ip_Add_Trigger();
   }
   server.on("/", SendWebsite);
   server.on("/xml", SendXML);
@@ -279,14 +294,15 @@ void loop() {
   
   //watchDogCount = 0;
   //triggerCheck();
-  if ((millis() - SensorUpdate) >= 1000) {
+  if ((millis() - SensorUpdate) >= 2000) {
     SensorUpdate = millis();
-    //level_XML = liquidCalib();
+    level_XML = liquidCalib();
     temp_XML = ds18b20Calib();
-    //solid_XML = solidCalib();
-   // press_XML = pressCalib();
+    liquPress_XML = liquPressCalib();
+    airPress_XML = airPressCalib();
+    solid_XML = solidCalib();
+    tds_XML = tdsCalib();
     cpuTempVal = cpuTempCalib();
-    //tds_XML = tdsCalib();
   }
   server.handleClient();
   if(buttonThreeStatus) {delay(1000); buttonThreeStatus = false; digitalWrite(19, LOW);} 
@@ -346,11 +362,8 @@ void timeToString(char* string, size_t size)  {
 // code to send the main web page
 // PAGE_MAIN is a large char defined in SuperMon.h
 void SendWebsite() {
-  // you may have to play with this value, big pages need more porcessing time, and hence
-  // a longer timeout that 200 ms
-  server.send(800, "text/html", PAGE_MAIN);
+  server.send(200, "text/html", PAGE_MAIN);
 }
-
 // code to send the main web page
 // I avoid string data types at all cost hence all the char mainipulation code
 void SendXML() {
@@ -361,11 +374,14 @@ void SendXML() {
   // send temp_XML
   sprintf(buf, "<G>%4.1f</G>\n", temp_XML);
   strcat(XML, buf);
+  // send liquPress_XMLL
+  sprintf(buf, "<G>%4.1f</G>\n", liquPress_XML);
+  strcat(XML, buf);
+  // send airPress_XML
+  sprintf(buf, "<G>%4.1f</G>\n", airPress_XML);
+  strcat(XML, buf);
   // send feed_XML
   sprintf(buf, "<G>%d</G>\n", solid_XML);
-  strcat(XML, buf);
-  // send press_XML
-  sprintf(buf, "<G>%4.1f</G>\n", press_XML);
   strcat(XML, buf);
   // send tds_XML
   sprintf(buf, "<G>%d</G>\n", tds_XML);
@@ -414,6 +430,10 @@ void SendXML() {
   // send datatable values for dashboard
   sprintf(buf, "<DT>%4.1f</DT>\n", maxTemp);
   strcat(XML, buf);
+  sprintf(buf, "<DT>%4.1f</DT>\n", liquPressure);
+  strcat(XML, buf);
+  sprintf(buf, "<DT>%4.1f</DT>\n", airPressure);
+  strcat(XML, buf);
   sprintf(buf, "<DT>%d</DT>\n", cpuTempVal);
   strcat(XML, buf);
   sprintf(buf, "<DT>%s</DT>\n", strTime);
@@ -423,38 +443,16 @@ void SendXML() {
   //Serial.println(XML);
   server.send(200, "text/xml", XML);
   }
+
 // Function to calculate Liquid level from the UART Waterproof distance sensor connected to Serial2.
 float liquidCalib() {
-  tfmpLiquid.getData(tfDist);
-  level_dist = map(tfDist,0,50,0,1300);
+  tfmpLiquid.getData(tfDist1);
+  level_dist = map(tfDist1,0,50,0,1300);
   if(level_dist >= 1300)  {level_dist = 1300; }
   delay(10); 
-  return level_dist; 
+  return level_dist;  
 }
-// Function to calculate an average pressure value over specified number of samples (to limit fluctuations) and to convert 
-// values from the 100 PSI pressure sensor (connected to analog pin 5) to accurately reflect the circuit environment.
-float pressCalib()  {
-  rawPress = analogRead(34); 
-  pressure = ((rawPress-pressZero)*ratedMaxPSI)/(pressMax-pressZero); 
-  if (pressure >= 5) {pressure = 5;}
-  if (pressure <= 0.5) {pressure = 0;} 
-  //The following code is to calculate the rolling average of the last 10 readings...
-  totalPress = totalPress - readingsPress[readIndexPress];
-  readingsPress[readIndexPress] = pressure;
-  totalPress = totalPress + readingsPress[readIndexPress];
-  readIndexPress = readIndexPress + 1;
-  if (readIndexPress >= numPressReadings) { readIndexPress = 0; }
-  avgPress = totalPress / numPressReadings;
-  return avgPress;
-}
-// Function to calculate Solid level from the UART Waterproof distance sensor connected to Serial3.
-float solidCalib() {
-  tfmpSolid.getData(tfDist);
-  solid_dist = map(tfDist,0,50,0,100);
-  if(solid_dist >= 100)  {solid_dist = 100; }
-  delay(10); 
-  return solid_dist; 
-}
+
 // Function to calculate Liquid Temperature  using the DS18B20 Waterproof Temperature Sensor
 float ds18b20Calib() {
   previousTemp = tempObjecC;
@@ -472,9 +470,42 @@ float ds18b20Calib() {
   if (tempObjecC > 40) {tempObjecC = 40; }
   return tempObjecC;
 }
+
+// Function to calculate pressure of of water oxygen pump 
+// values from the 5 PSI pressure sensor (connected to pin 36) 
+float liquPressCalib()  {
+  rawPress = (float)analogRead(39);
+  liquPressure = rawPress * (3.3 / 4096); 
+  liquPressure = (liquPressure - baselineVoltageLiqu) * (5.0 / (3.3 - baselineVoltageLiqu));
+  if (liquPressure >= 10) {liquPressure = 10;}
+  if (liquPressure <= 0.5) {liquPressure = 0;} 
+  return liquPressure;
+}
+
+// Function to calculate pressure of of water filtration system 
+// values from the 5 PSI pressure sensor (connected to pin 36) 
+float airPressCalib()  {
+  rawPress = (float)analogRead(36);
+  airPressVolts = rawPress * (3.3 / 4096);
+  airPressure = (airPressVolts - baselineVoltageAir) * (5.0 / (3.3 - baselineVoltageAir)); 
+  if (airPressure >= 5) {airPressure = 5;}
+  if (airPressure <= 0.3) {airPressure = 0;} 
+  return airPressure;
+}
+
+// Function to calculate Solid level from the UART Waterproof distance sensor connected to Serial3.
+float solidCalib() {
+  tfmpSolid.getData(tfDist2);
+  solid_dist = map(tfDist2,0,50,0,100);
+  if(solid_dist >= 100)  {solid_dist = 100; }
+  delay(10); 
+  return solid_dist; 
+}
+
 // Function to calculate liquid quality TDS (Total Dissolved Solids) in ppm for water
 float tdsCalib() {
-    analogBuffer[analogBufferIndex] = analogRead(36);    //read the analog value and store into the buffer
+    //analogBuffer[analogBufferIndex] = analogRead(35);    //read the analog value and store into the buffer
+    analogBuffer[analogBufferIndex] = random(200,230);       //read the analog value and store into the buffer
     analogBufferIndex++;
     if(analogBufferIndex == SCOUNT){ 
       analogBufferIndex = 0;
@@ -486,7 +517,7 @@ float tdsCalib() {
       float compensationVoltage=averageVoltage/compensationCoefficient;
       tdsValue = (133.42*compensationVoltage*compensationVoltage*compensationVoltage - 255.86*compensationVoltage*compensationVoltage + 857.39*compensationVoltage)*0.5;
       if(tdsValue < 0)  {tdsValue = 0;}
-    }
+   }
   return tdsValue;
 }
 // Used for the tdsCalib() function (median filtering algorithm)
