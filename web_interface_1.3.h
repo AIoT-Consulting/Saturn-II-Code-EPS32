@@ -81,7 +81,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
     #table_G1{
       table-layout: auto;
       width: 60%;
-      max-width: 900px;
+      max-width: 920px;
       min-width: 680px;
       height: auto;
       border: 0px solid black;
@@ -90,10 +90,10 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
     #table_G3{
       table-layout: auto;
       width: 60%;
-      max-width: 800px;
+      max-width: 920px;
       min-width: 680px;
       height: auto;
-      border: 2px solid rgb(203, 202, 202);
+      border: 6px solid rgb(203, 202, 202);
       border-radius: 5px;
       background-color: white;
       padding: 0px;
@@ -101,7 +101,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
     #table_data{
       table-layout: auto;
       width: 60%;
-      max-width: 800px;
+      max-width: 920px;
       min-width: 680px;
       height: auto;
       border: 3px solid rgb(203, 202, 202);
@@ -113,7 +113,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
     #table_S{
       table-layout: auto;
       width: 60%;
-      max-width: 800px;
+      max-width: 920px;
       min-width: 670px;
       height: auto;
       border: 0px solid white;
@@ -329,7 +329,6 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
             <h3>Monitoring System</h2><br></td></center>   
       </table></center>
       <center><table id="table_G1">
-      <tr>
       <!-- Pond Water Level gauge -->     
               <td align="left">
               <canvas id="gauge_1" data-type="linear-gauge"
@@ -340,7 +339,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-units="gals"
                     data-font-units-size="30"
                     data-font-units-style="bolder"
-                    data-title="Level"
+                    data-title="Water Level"
                     data-font-title-style="bolder"
                     data-font-title-size="25"
                     data-color-title="black"
@@ -370,9 +369,9 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-border-inner-width="0">
               </canvas>
               </td>
-              <!-- Pond Water Temperature gauge -->     
+      <!-- Pond Water Temperature gauge -->     
               <td align="left">
-                <canvas id="gauge_2" data-type="linear-gauge"
+              <canvas id="gauge_2" data-type="linear-gauge"
                     data-width="115"
                     data-height="450"
                     data-border-radius="10"
@@ -407,30 +406,30 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-border-outer-width="3"
                     data-border-middle-width="2"
                     data-border-inner-width="0">
-                     </canvas>
-                </td>
-                <!-- Fish Food gauge -->
-                <td align="center">
-                <canvas id="gauge_3" data-type="radial-gauge"
+                </canvas>
+                </td> 
+      <!-- Water Pump Pressure gauge -->
+              <td align="center">
+              <canvas id="gauge_3" data-type="radial-gauge"
                     data-width="225"
                     data-height="225"
                     data-units="&#xFF05"
                     data-font-title-style="bolder"
                     data-color-title="black"
-                    data-title="Fish Food"
-                    data-value="5"
+                    data-title="Water Pump Press"
+                    data-value="0"
                     data-value-Int="1"
-                    data-value-Dec="0"
+                    data-value-Dec="1"
                     data-animate-on-init="true"
                     data-animated-value="true"
                     data-min-value="0"
-                    data-max-value="100"
-                    data-major-ticks="0,10,20,30,40,50,60,70,80,90,100"
+                    data-max-value="5"
+                    data-major-ticks="0,1,2,3,4,5"
                     data-minor-ticks="10"
                     data-highlights='[
-                    { "from": 0, "to": 10, "color": "rgba(193, 51, 51,.75)" },
-                    { "from": 10, "to": 30, "color": "rgba(255, 241, 41,.85)" },
-                    { "from": 30, "to": 100, "color": "rgba(44, 201, 55,.75)" }                        
+                    { "from": 0, "to": 1, "color": "rgba(193, 51, 51,.75)" },
+                    { "from": 1, "to": 1.5, "color": "rgba(255, 241, 41,.85)" },
+                    { "from": 1.5, "to": 5, "color": "rgba(44, 201, 55,.75)" }                       
                     ]'
                     data-color-needle-start="rgba(240, 128, 128, 1)"
                     data-color-needle-end="rgba(255, 160, 122, .9)"
@@ -441,7 +440,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-border-middle-width="5"
                     data-border-inner-width="3">
                 </canvas><br>
-                <!-- Air Pressure gauge -->
+      <!-- Air Pressure gauge -->
                 <canvas id="gauge_4" data-type="radial-gauge"
                     data-width="225"
                     data-height="225"
@@ -459,9 +458,9 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-major-ticks="0,1,2,3,4,5"
                     data-minor-ticks="10"
                     data-highlights='[
-                    { "from": 0, "to": 2, "color": "rgba(193, 51, 51,.75)" },
-                    { "from": 2, "to": 4, "color": "rgba(255, 241, 41,.85)" },
-                    { "from": 4, "to": 5, "color": "rgba(44, 201, 55,.75)" }                       
+                    { "from": 0, "to": 1, "color": "rgba(193, 51, 51,.75)" },
+                    { "from": 1, "to": 1.5, "color": "rgba(255, 241, 41,.85)" },
+                    { "from": 1.5, "to": 5, "color": "rgba(44, 201, 55,.75)" }                       
                     ]'
                     data-color-needle-start="rgba(240, 128, 128, 1)"
                     data-color-needle-end="rgba(255, 160, 122, .9)"
@@ -472,8 +471,56 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-border-middle-width="5"
                     data-border-inner-width="3">
                 </canvas>
-                </td>
-                <td style="vertical-align:bottom">
+                </td>       
+      <!-- Fish Food Level gauge -->     
+              <td align="left">
+              <canvas id="gauge_5" data-type="linear-gauge"
+                    data-width="115"
+                    data-height="450"
+                    data-bar-width="10"
+                    data-needle-width="20"
+                    data-needle-start="15"
+                    data-needle-end="75"
+                    data-needle-side="left"
+                    data-border-radius="10"
+                    data-bar-begin-circle="false"
+                    data-units="&#xFF05"
+                    data-font-units-size="30"
+                    data-font-units-style="bolder"
+                    data-title="Food Level"
+                    data-font-title-style="bolder"
+                    data-font-title-size="25"
+                    data-color-title="black"
+                    data-value="0"
+                    data-value-Int="1"
+                    data-value-Dec="1"
+                    data-tick-side="right"
+                    data-ticks-width="22"
+                    data-number-side="right"
+                    data-animate-on-init="true"
+                    data-animated-value="true"
+                    data-min-value="0"
+                    data-max-value="100"
+                    data-major-ticks="0,10,20,30,40,50,60,70,80,90,100"
+                    data-minor-ticks="10"
+                    data-highlights='[
+                    { "from": 0, "to": 10, "color": "rgba(193, 51, 51,.75)" },
+                    { "from": 10, "to": 30, "color": "rgba(255, 241, 41,.85)" },
+                    { "from": 30, "to": 100, "color": "rgba(44, 201, 55,.75)" }                        
+                    ]'
+                    data-highlights-width="20"
+                    data-color-needle-start="rgba(240, 128, 128, 1)"
+                    data-color-needle-end="rgba(255, 160, 122, .9)"
+                    data-value-box="true"
+                    data-value-text-shadow="true"
+                    data-animation-rule="linear"
+                    data-animation-duration="500"
+                    data-border-outer-width="3"
+                    data-border-middle-width="2"
+                    data-border-inner-width="0">
+              </canvas>
+              </td>
+              <td style="vertical-align:bottom">
                     <center><h3>Status</h3><br>
                     <img src="https://aiot-consulting.github.io/Static-Assets/online.png" alt="Connection Status"  width="115" id="statusIndicator0">
                     <br>
@@ -489,7 +536,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     <tr>
                         <td align="center">
                             <!-- TDS Value gauge -->
-                            <canvas id="gauge_5" data-type="linear-gauge"
+                            <canvas id="gauge_6" data-type="linear-gauge"
                             data-width="646"
                             data-height="130"
                             data-bar-stroke-width="0"
@@ -653,20 +700,25 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       document.getElementById("gauge_2").setAttribute("data-value", message);
       document.getElementById("dataTable1").innerHTML = message;
       
-      // Gauge 3 Feeder Level
+      // Gauge 3 Liquid Pressure
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[2].firstChild.nodeValue;
       document.getElementById("gauge_3").setAttribute("data-value", message);
-
-      // Gauge 4 Pressure Level
+      
+      // Gauge 4 Air Pressure
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[3].firstChild.nodeValue;
-      document.getElementById("gauge_4").setAttribute("data-value", message);      
-      
-      // Gauge 5 TDS
+      document.getElementById("gauge_4").setAttribute("data-value", message);
+
+      // Gauge 5 Solid Level
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[4].firstChild.nodeValue;
-      document.getElementById("gauge_5").setAttribute("data-value", message);
+      document.getElementById("gauge_5").setAttribute("data-value", message);      
+      
+      // Gauge 6 TDS
+      xmldoc = xmlResponse.getElementsByTagName("G");
+      message = xmldoc[5].firstChild.nodeValue;
+      document.getElementById("gauge_6").setAttribute("data-value", message);
       document.getElementById("dataTable6").innerHTML = message;
       // Switch 1
       if (this.responseXML.getElementsByTagName('SW')[0].childNodes[0].nodeValue === "1") {         
@@ -745,10 +797,18 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
 
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[1].firstChild.nodeValue;
-      document.getElementById("dataTable7").innerHTML = message;
-      
+      document.getElementById("dataTable3").innerHTML = message;
+
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[2].firstChild.nodeValue;
+      document.getElementById("dataTable4").innerHTML = message;
+      
+      xmldoc = xmlResponse.getElementsByTagName("DT");
+      message = xmldoc[3].firstChild.nodeValue;
+      document.getElementById("dataTable7").innerHTML = message;
+
+      xmldoc = xmlResponse.getElementsByTagName("DT");
+      message = xmldoc[4].firstChild.nodeValue;
       document.getElementById("dataTable8").innerHTML = message;
     }
   
