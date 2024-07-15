@@ -1,15 +1,47 @@
-#include <WiFi.h>             // standard library
+/*--------------------------------------------------------------
+  Program:      Pond Monitoring and Automation System Dashboard
+  Version:      v1.0.4
+  Description:  This C++ code works on the ESP32 microprocessor in conjunction with a web server web page
+                to display a dashboard containing 6 analalog Canvas-Gauge dials, 8 numerical data points, 2 interactive toggle switches 
+                which control relays 1 & 2, two interactive pushbutton type switches to control a reset and override function as well as
+                6 graphical status indicators.
+                The main web page is stored in a large string variable stored the ESP32's memory, graphics and larger js files are stored on a CDN. 
+                Ajax is used to update the analog values of the Gauges, the table data and the toggle switches associated with the webpage in realtime. 
+                There is some customizable intelligence built into the program which triggers relays should sensors supply data outside nominal 
+                operating parameters as well as send rich text notifications to the operators smartphone of specific issue encountered. 
+  
+  Hardware:     Espressif ESP32 compatible board (ex: ESP32-DevKitC-32UE) 
+                Also required is a 2 channel 5VDC DIN Rail relay, an external power supply and other components such as specialized sensors,
+                bus extenders and mounting hardware based on specific needs.                
+                
+  Software:     Developed using Arduino 2.1.0 software
+                
+  
+  References:   - Canvas-Gauge from:
+                  https://github.com/Mikhus/canv-gauge
+                - Stopwatch_RT Library by Rob Tillaart
+                  https://github.com/RobTillaart/Stopwatch_RT
+                - Data smoothing library for sensor inputs by Matt Fryer
+                  https://github.com/MattFryer/Smoothed
+  
+  Date:         July 15th, 2024
+ 
+  Author:       Richard Inniss, http://aiotconsulting.com
+--------------------------------------------------------------*/
+#include <WiFi.h>             
 #include <WiFiManager.h>
 #include <WebServer.h>
 #include <SPI.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <TFMPlus.h>  // Include TFMini Plus Library v1.5.0
+#include <TFMPlus.h>                    // Include TFMini Plus Library v1.5.0
 #include <StopWatch.h>
 #include <Ticker.h>
-#include "web_interface_1.3.h"         // .h file that stores our webpage interface
+#include "web_interface_1.3.h"         // .h file that stores our webpage
 #include <HTTPClient.h>
 #include <Smoothed.h>
+#include<HardwareSerial.h>
+
 // Individual SMS event triggers
 const char* eventLiquid = "https://maker.ifttt.com/trigger/Liquid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
 const char* eventSolid = "https://maker.ifttt.com/trigger/Solid_Low/with/key/kg0Hq89vMVBXu0RtTG-g7a-uyr3LFWICCROFKN2Ieze";
@@ -35,10 +67,12 @@ int offCount = 0;
 float VoltsA0 = 0, VoltsA1 = 0;
 bool senderOverride = false; 
 bool smsSolidOverride, smsTempOverride, smsTdsOverride, smsLevelOverride, smsWarnOverride = false;       
-bool LED0 = false, SomeOutput = false;
+bool LED0 = false, SomeOutput = false, altFunc = false;
 uint32_t SensorUpdate = 0;
 
+
 // LIQUID LEVEL VARIABLES
+float distance1 = 0.0; 
 byte hdr, data_h, data_l, chksum, check;
 int level_XML = 0;
 int level_dist = 0;
@@ -47,8 +81,7 @@ int pondLevelVal = 0;
 int levelConsistFull = 0;
 int levelConsistEmpty = 0;
 int warnConsistFull = 0;
-int warnConsistEmpty = 0;
-unsigned int distance1;                              
+int warnConsistEmpty = 0;                           
 String lvlString = "999";
 const int numDist1Readings = 5;
 int readingsDist1[numDist1Readings];
@@ -56,8 +89,8 @@ int readIndexDist1 = 0;
 unsigned long totalDist1 = 0;                   
 float avgDist1 = 0;
 float duration1;  
-unsigned char data[4] = {};
 int sum;
+
 
 // TEMP SENSOR VARIABLES:
 #define ONE_WIRE_BUS 15
@@ -162,7 +195,8 @@ char buf[32];
 
 WebServer server(80);
 Smoothed <float> Liquid_Sensor_Smoothing;
-TFMPlus tfmpLiquid;                                   // Create a TFMini Plus object for liquid level
+//TFMPlus tfmpLiquid;                                 // Create a TFMini Plus object for liquid level
+HardwareSerial SerialLiquid(2);
 TFMPlus tfmpSolid;                                    // Create a TFMini Plus object for solid level
 OneWire oneWire(ONE_WIRE_BUS);                        // Setup a oneWire instance to communicate with any OneWire devices
 DallasTemperature sensors(&oneWire);                  // Pass our oneWire reference to Dallas Temperature sensor 
@@ -213,9 +247,10 @@ void setup() {
   tfmpSolid.begin( &Serial1);
   tfmpSolid.sendCommand( SOFT_RESET, 0);
   delay(200);
-  Serial2.begin(115200, SERIAL_8N1, 16, 17);  
-  tfmpLiquid.begin( &Serial2);
-  tfmpLiquid.sendCommand( SOFT_RESET, 0);
+  SerialLiquid.begin(9600, SERIAL_8N1, 16, 17); 
+  //Serial2.begin(9600, SERIAL_8N1, 16, 17);  
+  //tfmpLiquid.begin( &Serial2);
+  //tfmpLiquid.sendCommand( SOFT_RESET, 0);
   Liquid_Sensor_Smoothing.begin(SMOOTHED_AVERAGE, 10);
 
   //watchDogTick.attach(1, isrWatchdog);
@@ -225,7 +260,8 @@ void setup() {
   pinMode(5, OUTPUT);         // Pushbutton LED for Switch 2
   pinMode(4, OUTPUT);         // WiFi Connection LED
   pinMode(15, INPUT);         // For OneWire Bus
-  pinMode(17, OUTPUT);
+  pinMode(16, INPUT);         // A02YYUW Waterproof Ultrasonic Sensor trigger pin
+  pinMode(17, OUTPUT);        // A02YYUW Waterproof Ultrasonic Sensor echo pin
   digitalWrite(17, LOW);
   pinMode(19, OUTPUT);        // Pushbutton LED for RESET
   pinMode(21, OUTPUT);        // Pushbutton LED for OVERRIDE
@@ -295,12 +331,13 @@ void loop() {
   //watchDogCount = 0;
   //triggerCheck();
   if ((millis() - SensorUpdate) >= 2000) {
+    altFunc = !altFunc;
     SensorUpdate = millis();
     level_XML = liquidCalib();
-    temp_XML = ds18b20Calib();
+    if(altFunc) {temp_XML = ds18b20Calib();}
     liquPress_XML = liquPressCalib();
     airPress_XML = airPressCalib();
-    solid_XML = solidCalib();
+    if(!altFunc) {solid_XML = solidCalib();}
     tds_XML = tdsCalib();
     cpuTempVal = cpuTempCalib();
   }
@@ -444,13 +481,43 @@ void SendXML() {
   server.send(200, "text/xml", XML);
   }
 
-// Function to calculate Liquid level from the UART Waterproof distance sensor connected to Serial2.
+// Function to calculate Liquid level from the UART Waterproof distance LIDAR sensor connected to Serial2.
 float liquidCalib() {
-  tfmpLiquid.getData(tfDist1);
-  level_dist = map(tfDist1,0,50,0,1300);
-  if(level_dist >= 1300)  {level_dist = 1300; }
+    digitalWrite(17, LOW);                      // Clear the trigPin by setting it to LOW
+    delayMicroseconds(5);
+    digitalWrite(17, HIGH);                     // Trigger the sensor by setting the trigPin high for 10 microseconds
+    delayMicroseconds(10);
+    digitalWrite(17, LOW);
+    duration1 = pulseIn(16, HIGH);              // Read the echoPin. pulseIn() returns the duration (length of the pulse) in microseconds
+    delay(25);
+    distance1 = (duration1/2) * 0.343;         // 0.0343 is the conversion factor forbaased on 343 metres per second as speed of sound, divide by 100 as we want centimeters and divided by 2 for one way distance only. 
+    
+    distance1 = map(distance1,610,242,0,1200);  // At 1 inche of the HC-SR04 Rim, the distance1 calibrated reading is 1.06, at 29.5 inches of the HC-SR04 Rim, calibrated reading is 29.6. So we will use 1 & 30. Full barrel equals 110 liters.
+    
+    if (distance1 >= 1300) {distance1 = 1300;}
+    if (distance1 <= 1) {distance1 = 0;} 
+    //The following code is to calculate the rolling average of the last 10 readings...
+    totalDist1 = totalDist1 - readingsDist1[readIndexDist1];
+    readingsDist1[readIndexDist1] = distance1;
+    totalDist1 = totalDist1 + readingsDist1[readIndexDist1];
+    readIndexDist1 = readIndexDist1 + 1;
+    if (readIndexDist1 >= numDist1Readings) { readIndexDist1 = 0; }
+    avgDist1 = totalDist1 / numDist1Readings;
+    
+return avgDist1;
+}
+
+// Function to calculate Solid level from the UART Waterproof distance LIDAR sensor connected to Serial3.
+float solidCalib() {
+  if(tfmpSolid.getData(tfDist2))  {
+  solid_dist = map(tfDist2,22,4,0,100);
+  if(solid_dist >= 100)  {solid_dist = 100; }
+  if(solid_dist <= 0)  {solid_dist = 0; }
   delay(10); 
-  return level_dist;  
+  } else  {
+  solid_dist = 0;
+  }
+  return solid_dist; 
 }
 
 // Function to calculate Liquid Temperature  using the DS18B20 Waterproof Temperature Sensor
@@ -479,6 +546,7 @@ float liquPressCalib()  {
   liquPressure = (liquPressure - baselineVoltageLiqu) * (5.0 / (3.3 - baselineVoltageLiqu));
   if (liquPressure >= 10) {liquPressure = 10;}
   if (liquPressure <= 0.5) {liquPressure = 0;} 
+  
   return liquPressure;
 }
 
@@ -493,14 +561,6 @@ float airPressCalib()  {
   return airPressure;
 }
 
-// Function to calculate Solid level from the UART Waterproof distance sensor connected to Serial3.
-float solidCalib() {
-  tfmpSolid.getData(tfDist2);
-  solid_dist = map(tfDist2,0,50,0,100);
-  if(solid_dist >= 100)  {solid_dist = 100; }
-  delay(10); 
-  return solid_dist; 
-}
 
 // Function to calculate liquid quality TDS (Total Dissolved Solids) in ppm for water
 float tdsCalib() {
