@@ -1,6 +1,6 @@
 /*--------------------------------------------------------------
   Program:      Pond Monitoring and Automation System Dashboard
-  Version:      v1.0.4
+  Version:      v1.0.4b
   Description:  This C++ code works on the ESP32 microprocessor in conjunction with a web server web page
                 to display a dashboard containing 6 analalog Canvas-Gauge dials, 8 numerical data points, 2 interactive toggle switches 
                 which control relays 1 & 2, two interactive pushbutton type switches to control a reset and override function as well as
@@ -26,6 +26,7 @@
  
   Author:       Richard Inniss, http://aiotconsulting.com
 --------------------------------------------------------------*/
+String firmware = "v1.0.4b";
 #include <WiFi.h>             
 #include <WiFiManager.h>
 #include <WebServer.h>
@@ -35,7 +36,7 @@
 #include <TFMPlus.h>                    // Include TFMini Plus Library v1.5.0
 #include <StopWatch.h>
 #include <Ticker.h>
-#include "web_interface_1.3.h"         // .h file that stores our webpage
+#include "web_interface_1.4.h"         // .h file that stores our webpage
 #include <HTTPClient.h>
 #include<HardwareSerial.h>
 #include <NewPing.h>
@@ -313,7 +314,7 @@ void loop() {
     //level_XML = liquidCalib();
     if(altFunc) {temp_XML = ds18b20Calib();}
     if(!altFunc) {solid_XML = solidCalib();}
-    //liquPress_XML = liquPressCalib();
+    liquPress_XML = liquPressCalib();
     airPress_XML = airPressCalib();
     //tds_XML = tdsCalib();
     cpuTempVal = cpuTempCalib();
@@ -451,6 +452,9 @@ void SendXML() {
   sprintf(buf, "<DT>%d</DT>\n", cpuTempVal);
   strcat(XML, buf);
   sprintf(buf, "<DT>%s</DT>\n", strTime);
+  strcat(XML, buf);
+  // send Firmware version
+  sprintf(buf, "<FW>%s</FW>\n", firmware);
   strcat(XML, buf);
   strcat(XML, "</Data>\n");
   // End of XML file
