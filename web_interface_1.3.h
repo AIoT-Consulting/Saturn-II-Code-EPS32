@@ -345,7 +345,7 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
                     data-color-title="black"
                     data-value="0"
                     data-value-Int="1"
-                    data-value-Dec="1"
+                    data-value-Dec="0"
                     data-animate-on-init="true"
                     data-animated-value="true"
                     data-min-value="0"
@@ -689,11 +689,10 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
       xmlResponse=xmlHttp.responseXML;
         
       // Gauge 1 Liquid Level
-      xmldoc = xmlResponse.getElementsByTagName("G"); 
+      xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[0].firstChild.nodeValue;
       document.getElementById("gauge_1").setAttribute("data-value", message);
-      document.getElementById("dataTable5").innerHTML = message;
-                 
+                       
       // Gauge 2 Liquid Temperature
       xmldoc = xmlResponse.getElementsByTagName("G");
       message = xmldoc[1].firstChild.nodeValue;
@@ -791,24 +790,29 @@ const char PAGE_MAIN[] PROGMEM = R":::::(
         image4.src='https://aiot-consulting.github.io/Static-Assets/feed_low.png';
                 }
       // Dashboard Table Data
+      // Max Water Temp
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[0].firstChild.nodeValue;
       document.getElementById("dataTable2").innerHTML = message;
-
+      // Liquid Press
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[1].firstChild.nodeValue;
       document.getElementById("dataTable3").innerHTML = message;
-
+      // Air Press
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[2].firstChild.nodeValue;
       document.getElementById("dataTable4").innerHTML = message;
-      
+      // Actual Water Level
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[3].firstChild.nodeValue;
-      document.getElementById("dataTable7").innerHTML = message;
-
+      document.getElementById("dataTable5").innerHTML = message;
+      // MCU Temp   
       xmldoc = xmlResponse.getElementsByTagName("DT");
       message = xmldoc[4].firstChild.nodeValue;
+      document.getElementById("dataTable7").innerHTML = message;
+      // Start/Stop Timer
+      xmldoc = xmlResponse.getElementsByTagName("DT");
+      message = xmldoc[5].firstChild.nodeValue;
       document.getElementById("dataTable8").innerHTML = message;
     }
   
